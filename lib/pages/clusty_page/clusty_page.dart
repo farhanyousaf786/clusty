@@ -1,0 +1,74 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../providers/theme_provider.dart';
+
+class ClustyPage extends StatefulWidget {
+  const ClustyPage({super.key});
+
+  @override
+  State<ClustyPage> createState() => _ClustyPageState();
+}
+
+class _ClustyPageState extends State<ClustyPage> {
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  Map<String, dynamic>? userData;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchUserData();
+  }
+
+  Future<void> fetchUserData() async {
+    User? user = _auth.currentUser;
+    if (user != null) {
+      DocumentSnapshot doc = await _firestore.collection('users').doc(user.uid).get();
+      setState(() {
+        userData = doc.data() as Map<String, dynamic>?;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Clusty'),
+        actions: [
+          IconButton(
+            icon: Icon(themeProvider.isDarkMode ? Icons.dark_mode : Icons.light_mode),
+            onPressed: () {
+              themeProvider.toggleTheme();
+            },
+          ),
+        ],
+      ),
+      body: userData == null
+          ? Center(child: CircularProgressIndicator())
+          : Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () async {
+                await _auth.signOut();
+                Navigator.of(context).pushReplacementNamed('/'); // Adjust this route according to your app's navigation structure
+              },
+              child: const Text('Sign Out'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
