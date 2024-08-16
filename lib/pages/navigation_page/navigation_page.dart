@@ -1,6 +1,6 @@
-import 'package:clusty/pages/chat_page/chat_page.dart';
-import 'package:clusty/pages/clusty_page/clusty_page.dart';
-import 'package:clusty/pages/search_page/search_page.dart';
+import 'package:clusty_stf/pages/chat_page/chat_page.dart';
+import 'package:clusty_stf/pages/clusty_page/clusty_page.dart';
+import 'package:clusty_stf/pages/search_page/search_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

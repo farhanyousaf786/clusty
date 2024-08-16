@@ -1,9 +1,9 @@
-import 'package:clusty/firebase_options.dart';
-import 'package:clusty/pages/landing_page/landing_page.dart';
-import 'package:clusty/providers/follow_provder.dart';
-import 'package:clusty/providers/theme_provider.dart';
-import 'package:clusty/providers/user_provider.dart';
-import 'package:clusty/services/get_it_locator.dart';
+import 'package:clusty_stf/firebase_options.dart';
+import 'package:clusty_stf/pages/landing_page/landing_page.dart';
+import 'package:clusty_stf/providers/follow_provder.dart';
+import 'package:clusty_stf/providers/theme_provider.dart';
+import 'package:clusty_stf/providers/user_provider.dart';
+import 'package:clusty_stf/services/get_it_locator.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

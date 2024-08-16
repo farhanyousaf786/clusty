@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'user_repository.dart';
-import 'package:clusty/models/user_model.dart';
+import 'package:clusty_stf/models/user_model.dart';
 
 class UserApi implements IUserRepository {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;

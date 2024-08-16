@@ -1,4 +1,4 @@
-import 'package:clusty/utils/app_constants.dart';
+import 'package:clusty_stf/utils/app_constants.dart';
 import 'package:flutter/material.dart';
 
 class Stories extends StatelessWidget {

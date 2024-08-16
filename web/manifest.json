@@ -1,6 +1,6 @@
 {
-    "name": "clusty",
-    "short_name": "clusty",
+    "name": "clusty_stf",
+    "short_name": "clusty_stf",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

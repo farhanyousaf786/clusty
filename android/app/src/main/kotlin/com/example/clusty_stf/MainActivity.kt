@@ -1,4 +1,4 @@
-package com.example.clusty
+package com.switchtofuture.clusty
 
 import io.flutter.embedding.android.FlutterActivity
 

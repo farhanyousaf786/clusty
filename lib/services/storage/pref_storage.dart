@@ -1,4 +1,4 @@
-import 'package:clusty/services/storage/storage.dart';
+import 'package:clusty_stf/services/storage/storage.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:clusty/models/post_model.dart';
+import 'package:clusty_stf/models/post_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import '../../models/user_model.dart';
@@ -159,6 +159,62 @@ class FollowProvider with ChangeNotifier {
     _posts = tempPosts;
 
     _isLoading = false;
+    notifyListeners();
+  }
+
+  Future<void> likePost(Post post) async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return;
+
+    bool isLiked = post.likes.contains(currentUser.uid);
+    if (isLiked) {
+      post.likes.remove(currentUser.uid);
+    } else {
+      post.likes.add(currentUser.uid);
+    }
+
+    await _firestore.runTransaction((transaction) async {
+      DocumentReference postRef = _firestore.collection('posts').doc(post.id);
+      DocumentReference userPostRef = _firestore
+          .collection('users')
+          .doc(post.userId)
+          .collection('user_posts')
+          .doc(post.id);
+
+      transaction.update(postRef, {'likes': post.likes});
+      transaction.update(userPostRef, {'likes': post.likes});
+    });
+
+    notifyListeners();
+  }
+
+  Future<void> addComment(Post post, String commentText) async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null || commentText.isEmpty) return;
+
+    Map<String, dynamic> comment = {
+      'userId': currentUser.uid,
+      'username': _user?.firstName ?? 'Anonymous',
+      'comment': commentText,
+      'timestamp': FieldValue.serverTimestamp(),
+    };
+
+    await _firestore.runTransaction((transaction) async {
+      DocumentReference postRef = _firestore.collection('posts').doc(post.id);
+      DocumentReference userPostRef = _firestore
+          .collection('users')
+          .doc(post.userId)
+          .collection('user_posts')
+          .doc(post.id);
+
+      DocumentSnapshot postSnapshot = await transaction.get(postRef);
+      List<dynamic> comments = postSnapshot.get('comments') ?? [];
+      comments.add(comment);
+
+      transaction.update(postRef, {'comments': comments});
+      transaction.update(userPostRef, {'comments': comments});
+    });
+
     notifyListeners();
   }
 }

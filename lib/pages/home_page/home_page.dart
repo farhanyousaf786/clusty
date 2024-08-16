@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:clusty/pages/home_page/promotion_slides.dart';
+import 'package:clusty_stf/pages/home_page/promotion_slides.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

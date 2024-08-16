@@ -11,6 +11,7 @@ class Post {
   final String mood;
   final List<String> tags;
   final Timestamp createdAt;
+  List<String> likes;
 
   Post({
     required this.id,
@@ -23,6 +24,7 @@ class Post {
     required this.mood,
     required this.tags,
     required this.createdAt,
+    this.likes = const [],
   });
 
   factory Post.fromDocument(DocumentSnapshot doc) {
@@ -36,6 +38,7 @@ class Post {
       mood: data['mood'],
       tags: List<String>.from(data['tags']),
       createdAt: data['createdAt'],
+      likes: List<String>.from(data['likes'] ?? []),
     );
   }
 
@@ -48,6 +51,7 @@ class Post {
       'mood': mood,
       'tags': tags,
       'createdAt': createdAt,
+      'likes': likes,
     };
   }
 }

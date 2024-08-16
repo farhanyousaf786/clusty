@@ -1,12 +1,49 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import '../../../models/post_model.dart';
+import '../../../providers/follow_provder.dart';
 import '../../../utils/app_constants.dart';
 
 class UserPosts extends StatelessWidget {
   final List<Post> posts;
 
   const UserPosts({Key? key, required this.posts}) : super(key: key);
+
+  void likePost(BuildContext context, Post post) async {
+    final followProvider = Provider.of<FollowProvider>(context, listen: false);
+    final userId = followProvider.user?.uid;
+
+    if (userId != null) {
+      final postRef = FirebaseFirestore.instance.collection('posts').doc(post.id);
+      final userPostRef = FirebaseFirestore.instance
+          .collection('users')
+          .doc(post.userId)
+          .collection('user_posts')
+          .doc(post.id);
+
+      FirebaseFirestore.instance.runTransaction((transaction) async {
+        final postSnapshot = await transaction.get(postRef);
+        final userPostSnapshot = await transaction.get(userPostRef);
+
+        if (postSnapshot.exists && userPostSnapshot.exists) {
+          final likes = List<String>.from(postSnapshot['likes'] ?? []);
+
+          if (likes.contains(userId)) {
+            likes.remove(userId);
+          } else {
+            likes.add(userId);
+          }
+
+          transaction.update(postRef, {'likes': likes});
+          transaction.update(userPostRef, {'likes': likes});
+        }
+      });
+    }
+  }
+
+
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +56,8 @@ class UserPosts extends StatelessWidget {
         final userImageUrl = post.userImageUrl.isNotEmpty
             ? post.userImageUrl
             : AppConstants.defaultImageUrl;
+        final followProvider = Provider.of<FollowProvider>(context, listen: false);
+        final userId = followProvider.user?.uid;
 
         return Card(
           margin: EdgeInsets.symmetric(vertical: 10, horizontal: 15),
@@ -70,6 +109,19 @@ class UserPosts extends StatelessWidget {
                       label: Text(tag),
                     );
                   }).toList(),
+                ),
+                Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.thumb_up,
+                        color: post.likes.contains(userId) ? Colors.blue : Colors.grey,
+                      ),
+                      onPressed: () => likePost(context, post),
+                    ),
+                    Text(post.likes.length.toString()),
+
+                  ],
                 ),
               ],
             ),

@@ -51,7 +51,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyBZOjkBhL_gH48aJZPWPZIdMkDp8fByKXw',
-    appId: '1:226076386151:android:c1ed8bbfbb8f0d657885c2',
+    appId: '1:226076386151:android:6d073e086178d0857885c2',
     messagingSenderId: '226076386151',
     projectId: 'clusty',
     storageBucket: 'clusty.appspot.com',
@@ -59,25 +59,25 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyCFVnaXKvrHmeW_q30cfQmAsO7-UA-kSsU',
-    appId: '1:226076386151:ios:88d7c054f2a1091a7885c2',
+    appId: '1:226076386151:ios:78e24f5596b332547885c2',
     messagingSenderId: '226076386151',
     projectId: 'clusty',
     storageBucket: 'clusty.appspot.com',
-    iosBundleId: 'com.example.clusty',
+    iosBundleId: 'com.example.clustyStf',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyCFVnaXKvrHmeW_q30cfQmAsO7-UA-kSsU',
-    appId: '1:226076386151:ios:88d7c054f2a1091a7885c2',
+    appId: '1:226076386151:ios:78e24f5596b332547885c2',
     messagingSenderId: '226076386151',
     projectId: 'clusty',
     storageBucket: 'clusty.appspot.com',
-    iosBundleId: 'com.example.clusty',
+    iosBundleId: 'com.example.clustyStf',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
     apiKey: 'AIzaSyCzu_K_ksnWIK1PMeC2L0D7VeUOL-g7I-4',
-    appId: '1:226076386151:web:f33ac346f9385a857885c2',
+    appId: '1:226076386151:web:b4eae5212a6178c77885c2',
     messagingSenderId: '226076386151',
     projectId: 'clusty',
     authDomain: 'clusty.firebaseapp.com',

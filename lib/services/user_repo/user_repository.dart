@@ -1,4 +1,4 @@
-import 'package:clusty/models/user_model.dart';
+import 'package:clusty_stf/models/user_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 abstract class IUserRepository {

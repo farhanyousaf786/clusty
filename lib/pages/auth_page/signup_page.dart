@@ -1,3 +1,4 @@
+import 'package:clusty_stf/pages/auth_page/clusty_privacy_policy.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/user_repo/user_apis.dart';
@@ -10,13 +11,14 @@ class SignUpPage extends StatefulWidget {
 
 class _SignUpPageState extends State<SignUpPage> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final TextEditingController _firstNameController = TextEditingController(); // Change this line
-  final TextEditingController _lastNameController = TextEditingController(); // Add this line
+  final TextEditingController _firstNameController = TextEditingController();
+  final TextEditingController _lastNameController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final UserApi _userApi = UserApi();
   bool _isUsernameUnique = true;
+  bool _isTermsAccepted = false;
 
   void _signUp() async {
     try {
@@ -28,8 +30,8 @@ class _SignUpPageState extends State<SignUpPage> {
       }
 
       String result = await _userApi.createUserWithEmailAndPassword(
-        firstName: _firstNameController.text.trim(), // Change this line
-        lastName: _lastNameController.text.trim(), // Add this line
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
         username: _usernameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
@@ -97,8 +99,33 @@ class _SignUpPageState extends State<SignUpPage> {
               decoration: InputDecoration(labelText: 'Password'),
               obscureText: true,
             ),
+            Row(
+              children: [
+                Checkbox(
+                  value: _isTermsAccepted,
+                  onChanged: (value) {
+                    setState(() {
+                      _isTermsAccepted = value!;
+                    });
+                  },
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (context) => ClustyPrivacyPolicy()),
+                      );
+                    },
+                    child: Text(
+                      'I accept the Terms and Conditions and Privacy Policy',
+                      style: TextStyle(decoration: TextDecoration.underline),
+                    ),
+                  ),
+                ),
+              ],
+            ),
             ElevatedButton(
-              onPressed: _signUp,
+              onPressed: _isTermsAccepted ? _signUp : null,
               child: Text('Sign Up'),
             ),
           ],

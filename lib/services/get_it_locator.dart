@@ -1,10 +1,10 @@
 
 
 
-import 'package:clusty/services/storage/pref_storage.dart';
-import 'package:clusty/services/storage/storage.dart';
-import 'package:clusty/services/user_repo/user_apis.dart';
-import 'package:clusty/services/user_repo/user_repository.dart';
+import 'package:clusty_stf/services/storage/pref_storage.dart';
+import 'package:clusty_stf/services/storage/storage.dart';
+import 'package:clusty_stf/services/user_repo/user_apis.dart';
+import 'package:clusty_stf/services/user_repo/user_repository.dart';
 import 'package:get_it/get_it.dart';
 
 
