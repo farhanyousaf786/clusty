@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
 import '../../providers/auth_provider.dart';
 
 class SignUpScreen extends ConsumerStatefulWidget {
@@ -19,28 +20,55 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   String? _usernameError;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  Timer? _debounceTimer;
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _debounceTimer?.cancel();
+    super.dispose();
+  }
 
   Future<void> _checkUsername(String username) async {
-    if (username.isEmpty) return;
-    
-    setState(() => _usernameError = null);
-    
-    try {
-      final isAvailable = await ref.read(authProvider.notifier).isUsernameAvailable(username);
-      if (!isAvailable && mounted) {
-        setState(() => _usernameError = 'Username is already taken');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _usernameError = 'Error checking username');
-      }
+    // Cancel previous timer
+    _debounceTimer?.cancel();
+
+    if (username.isEmpty) {
+      setState(() => _usernameError = null);
+      return;
     }
+
+    // Basic validation first
+    if (username.length < 3) {
+      setState(() => _usernameError = 'Username must be at least 3 characters');
+      return;
+    }
+    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(username)) {
+      setState(() => _usernameError = 'Username can only contain letters, numbers, and underscores');
+      return;
+    }
+
+    // Debounce the API call
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () async {
+      try {
+        setState(() => _usernameError = null);
+        final isAvailable = await ref.read(authProvider.notifier).isUsernameAvailable(username);
+        if (!isAvailable && mounted) {
+          setState(() => _usernameError = 'Username is already taken');
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _usernameError = 'Error checking username');
+        }
+      }
+    });
   }
 
   Future<void> _signUp() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
     if (_usernameError != null) return;
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -52,30 +80,21 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
     setState(() => _isLoading = true);
     try {
       await ref.read(authProvider.notifier).signUp(
-        username: _usernameController.text.trim(),
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
+        username: _usernameController.text.trim(),
       );
       if (mounted) {
-        Navigator.pop(context); // Return to landing page which will redirect to home
+        Navigator.of(context).pop();
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.toString())),
         );
       }
     }
-    if (mounted) setState(() => _isLoading = false);
-  }
-
-  @override
-  void dispose() {
-    _usernameController.dispose();
-    _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
-    super.dispose();
   }
 
   @override
@@ -112,21 +131,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                   controller: _usernameController,
                   decoration: InputDecoration(
                     labelText: 'Username',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.alternate_email),
                     errorText: _usernameError,
-                    helperText: 'This will be your unique identifier',
+                    prefixIcon: const Icon(Icons.person),
+                    border: const OutlineInputBorder(),
                   ),
                   onChanged: _checkUsername,
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Please enter a username';
-                    }
-                    if (value.length < 3) {
-                      return 'Username must be at least 3 characters';
-                    }
-                    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(value)) {
-                      return 'Username can only contain letters, numbers, and underscores';
                     }
                     return null;
                   },

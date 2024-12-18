@@ -1,103 +1,72 @@
 class UserModel {
   final String id;
-  final String username;
-  final String name;
   final String email;
+  final String username;
   final String? photoUrl;
-  final int coins;
-  final List<String> friends;
-  final DateTime createdAt;
-  final DateTime? dateOfBirth;
-  final String about;
-  final bool isOnline;
-  final DateTime? lastSeen;
-  final DateTime? profileUpdatedAt;
+  final int createdAt;
+  final int followersCount;
+  final int followingCount;
+  final int postsCount;
+  final String? about;
 
   UserModel({
     required this.id,
-    required this.username,
-    this.name = '',
     required this.email,
+    required this.username,
     this.photoUrl,
-    this.coins = 0,
-    this.friends = const [],
     required this.createdAt,
-    this.dateOfBirth,
-    this.about = '',
-    this.isOnline = false,
-    this.lastSeen,
-    this.profileUpdatedAt,
+    required this.followersCount,
+    required this.followingCount,
+    required this.postsCount,
+    this.about,
   });
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'username': username,
-        'name': name,
-        'email': email,
-        'photoUrl': photoUrl,
-        'coins': coins,
-        'friends': friends,
-        'createdAt': createdAt.toIso8601String(),
-        'dateOfBirth': dateOfBirth?.toIso8601String(),
-        'about': about,
-        'isOnline': isOnline,
-        'lastSeen': lastSeen?.toIso8601String(),
-        'profileUpdatedAt': profileUpdatedAt?.toIso8601String(),
-      };
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'] as String,
+      email: json['email'] as String,
+      username: json['username'] as String,
+      photoUrl: json['photoUrl'] as String?,
+      createdAt: json['createdAt'] as int,
+      followersCount: json['followersCount'] as int? ?? 0,
+      followingCount: json['followingCount'] as int? ?? 0,
+      postsCount: json['postsCount'] as int? ?? 0,
+      about: json['about'] as String?,
+    );
+  }
 
-  factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
-        id: json['id'],
-        username: json['username'],
-        name: json['name'] ?? '',
-        email: json['email'],
-        photoUrl: json['photoUrl'],
-        coins: json['coins'] ?? 0,
-        friends: List<String>.from(json['friends'] ?? []),
-        createdAt: json['createdAt'] != null 
-            ? DateTime.parse(json['createdAt'])
-            : DateTime.now(),
-        dateOfBirth: json['dateOfBirth'] != null 
-            ? DateTime.parse(json['dateOfBirth'])
-            : null,
-        about: json['about'] ?? '',
-        isOnline: json['isOnline'] ?? false,
-        lastSeen: json['lastSeen'] != null 
-            ? DateTime.parse(json['lastSeen'])
-            : null,
-        profileUpdatedAt: json['profileUpdatedAt'] != null
-            ? DateTime.parse(json['profileUpdatedAt'])
-            : null,
-      );
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'email': email,
+      'username': username,
+      'photoUrl': photoUrl,
+      'createdAt': createdAt,
+      'followersCount': followersCount,
+      'followingCount': followingCount,
+      'postsCount': postsCount,
+      'about': about,
+    };
+  }
 
   UserModel copyWith({
-    String? id,
     String? username,
-    String? name,
-    String? email,
     String? photoUrl,
-    int? coins,
-    List<String>? friends,
-    DateTime? createdAt,
-    DateTime? dateOfBirth,
+    int? followersCount,
+    int? followingCount,
+    int? postsCount,
     String? about,
-    bool? isOnline,
-    DateTime? lastSeen,
-    DateTime? profileUpdatedAt,
   }) {
     return UserModel(
-      id: id ?? this.id,
+      id: id,
+      email: email,
       username: username ?? this.username,
-      name: name ?? this.name,
-      email: email ?? this.email,
       photoUrl: photoUrl ?? this.photoUrl,
-      coins: coins ?? this.coins,
-      friends: friends ?? this.friends,
-      createdAt: createdAt ?? this.createdAt,
-      dateOfBirth: dateOfBirth ?? this.dateOfBirth,
+      createdAt: createdAt,
+      followersCount: followersCount ?? this.followersCount,
+      followingCount: followingCount ?? this.followingCount,
+      postsCount: postsCount ?? this.postsCount,
       about: about ?? this.about,
-      isOnline: isOnline ?? this.isOnline,
-      lastSeen: lastSeen ?? this.lastSeen,
-      profileUpdatedAt: profileUpdatedAt ?? this.profileUpdatedAt,
     );
   }
 }

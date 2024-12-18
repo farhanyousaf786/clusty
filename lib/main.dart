@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'firebase_options.dart';
 import 'screens/landing_page.dart';
 import 'package:flutter/foundation.dart';
 import 'utils/logger.dart';
-import 'providers/theme_provider.dart';
 
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Enable verbose logging in debug mode
@@ -16,36 +16,42 @@ Future<void> main() async {
     Logger.i('Starting app in debug mode');
   }
 
-  // Initialize Firebase
   try {
+    // Initialize Firebase
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
     Logger.i('Firebase initialized successfully');
-  } catch (e) {
-    Logger.e('Failed to initialize Firebase', e);
+
+    // Initialize Realtime Database
+    FirebaseDatabase.instance.setPersistenceEnabled(true);
+    FirebaseDatabase.instance.ref().keepSynced(true);
+    Logger.i('Firebase Realtime Database initialized');
+
+    // Configure Firebase Auth settings
+    await FirebaseAuth.instance.setSettings(
+      appVerificationDisabledForTesting: kDebugMode,
+    );
+    Logger.i('Firebase Auth settings configured');
+
+    runApp(const ProviderScope(child: MyApp()));
+  } catch (e, stack) {
+    Logger.e('Failed to initialize Firebase', e, stack);
+    rethrow;
   }
-
-  // Configure Firebase Auth settings
-  await FirebaseAuth.instance.setSettings(
-    appVerificationDisabledForTesting: true,
-  );
-  Logger.i('Firebase Auth settings configured');
-
-  runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = ref.watch(themeProvider);
-    
+  Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Clusty',
-      debugShowCheckedModeBanner: false,
-      theme: theme,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
+      ),
       home: const LandingPage(),
     );
   }

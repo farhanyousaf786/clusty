@@ -6,6 +6,7 @@ import '../utils/logger.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../models/user_model.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -15,26 +16,49 @@ class ProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
-  bool _isEditing = false;
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _nameController;
-  late TextEditingController _aboutController;
-  DateTime? _selectedDate;
-  final _scrollController = ScrollController();
-
-  @override
-  void initState() {
-    super.initState();
-    _nameController = TextEditingController();
-    _aboutController = TextEditingController();
-  }
+  final _nameController = TextEditingController();
+  bool _isEditing = false;
+  bool _isLoading = false;
 
   @override
   void dispose() {
     _nameController.dispose();
-    _aboutController.dispose();
-    _scrollController.dispose();
     super.dispose();
+  }
+
+  void _startEditing(user) {
+    setState(() {
+      _isEditing = true;
+      _nameController.text = user.username;
+    });
+  }
+
+  Future<void> _saveProfile(user) async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      await ref.read(authProvider.notifier).updateProfile(
+        username: _nameController.text.trim(),
+        photoUrl: user.photoUrl,
+      );
+      
+      if (mounted) {
+        setState(() {
+          _isEditing = false;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    }
   }
 
   Future<void> _pickImage() async {
@@ -66,60 +90,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         );
       },
     );
-    if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
-  }
-
-  void _startEditing(user) {
-    setState(() {
-      _isEditing = true;
-      _nameController.text = user.name;
-      _aboutController.text = user.about;
-      _selectedDate = user.dateOfBirth;
-    });
-  }
-
-  Future<void> _saveChanges(user) async {
-    if (!_formKey.currentState!.validate()) return;
-
-    try {
-      await ref.read(authProvider.notifier).updateProfile(
-        userId: user.id,
-        name: _nameController.text.trim(),
-        about: _aboutController.text.trim(),
-        dateOfBirth: _selectedDate,
-      );
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Profile updated successfully'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
-        setState(() => _isEditing = false);
-      }
-    } catch (e) {
-      Logger.e('Error saving profile', e);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    if (picked != null) {
+      // TODO: Update user dateOfBirth
     }
   }
 
@@ -138,7 +110,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
           body: CustomScrollView(
-            controller: _scrollController,
             physics: const BouncingScrollPhysics(),
             slivers: [
               SliverAppBar(
@@ -207,8 +178,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   : null,
                               child: user.photoUrl == null
                                   ? Text(
-                                      user.name.isNotEmpty
-                                          ? user.name[0].toUpperCase()
+                                      user.username.isNotEmpty
+                                          ? user.username[0].toUpperCase()
                                           : user.username[0].toUpperCase(),
                                       style: GoogleFonts.poppins(
                                         fontSize: 40,
@@ -229,7 +200,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              user.name.isNotEmpty ? user.name : user.username,
+                              user.username,
                               style: GoogleFonts.poppins(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
@@ -248,15 +219,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   width: 8,
                                   height: 8,
                                   decoration: BoxDecoration(
-                                    color: user.isOnline
-                                        ? Colors.green
-                                        : theme.disabledColor,
+                                    color: Colors.green,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
                                 const SizedBox(width: 5),
                                 Text(
-                                  user.isOnline ? 'Online' : 'Offline',
+                                  'Online',
                                   style: GoogleFonts.poppins(
                                     color: theme.textTheme.bodyMedium?.color,
                                     fontSize: 14,
@@ -334,7 +303,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             controller: _nameController,
             style: TextStyle(color: theme.textTheme.bodyLarge?.color),
             decoration: InputDecoration(
-              labelText: 'Name',
+              labelText: 'Username',
               labelStyle: TextStyle(color: theme.textTheme.bodyMedium?.color),
               enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(15),
@@ -349,57 +318,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return 'Please enter your name';
+                return 'Please enter your username';
               }
               return null;
             },
-          ),
-          const SizedBox(height: 20),
-          TextFormField(
-            controller: _aboutController,
-            style: TextStyle(color: theme.textTheme.bodyLarge?.color),
-            maxLines: 3,
-            decoration: InputDecoration(
-              labelText: 'About',
-              labelStyle: TextStyle(color: theme.textTheme.bodyMedium?.color),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
-                borderSide: BorderSide(color: theme.primaryColor),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(15),
-                borderSide: BorderSide(color: theme.primaryColor, width: 2),
-              ),
-              filled: true,
-              fillColor: theme.cardColor,
-            ),
-          ),
-          const SizedBox(height: 20),
-          InkWell(
-            onTap: () => _selectDate(context, user.dateOfBirth),
-            child: Container(
-              padding: const EdgeInsets.all(15),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(15),
-                border: Border.all(color: theme.primaryColor),
-                color: theme.cardColor,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Birthday',
-                    style: GoogleFonts.poppins(color: theme.textTheme.bodyMedium?.color),
-                  ),
-                  Text(
-                    _selectedDate != null
-                        ? DateFormat.yMMMd().format(_selectedDate!)
-                        : 'Not set',
-                    style: GoogleFonts.poppins(color: theme.textTheme.bodyLarge?.color),
-                  ),
-                ],
-              ),
-            ),
           ),
           const SizedBox(height: 30),
           Row(
@@ -423,7 +345,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
               FilledButton(
-                onPressed: () => _saveChanges(user),
+                onPressed: () => _saveProfile(user),
                 style: FilledButton.styleFrom(
                   backgroundColor: theme.primaryColor,
                   padding: const EdgeInsets.symmetric(
@@ -454,54 +376,30 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatItem(
-            icon: Icons.monetization_on,
-            value: user.coins.toString(),
-            label: 'Coins',
-            color: theme.primaryColor,
-            theme: theme,
+          _buildStatsCard(
+            'Posts',
+            user.postsCount.toString(),
+            theme,
           ),
-          _buildDivider(theme),
-          _buildStatItem(
-            icon: Icons.people,
-            value: user.friends.length.toString(),
-            label: 'Friends',
-            color: theme.primaryColor,
-            theme: theme,
+          _buildStatsCard(
+            'Followers',
+            user.followersCount.toString(),
+            theme,
           ),
-          _buildDivider(theme),
-          _buildStatItem(
-            icon: Icons.star,
-            value: '4.8',
-            label: 'Rating',
-            color: theme.primaryColor,
-            theme: theme,
+          _buildStatsCard(
+            'Following',
+            user.followingCount.toString(),
+            theme,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDivider(ThemeData theme) {
-    return Container(
-      height: 40,
-      width: 1,
-      color: theme.dividerColor,
-    );
-  }
-
-  Widget _buildStatItem({
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color color,
-    required ThemeData theme,
-  }) {
+  Widget _buildStatsCard(String label, String value, ThemeData theme) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(height: 8),
         Text(
           value,
           style: GoogleFonts.poppins(
@@ -542,7 +440,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           const SizedBox(height: 10),
           Text(
-            user.about.isEmpty ? 'No description added yet' : user.about,
+            user.about?.isEmpty ?? true ? 'No description added yet' : user.about!,
             style: GoogleFonts.poppins(
               color: theme.textTheme.bodyMedium?.color,
               height: 1.5,
@@ -573,27 +471,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ),
           const SizedBox(height: 15),
-          _buildDetailRow(Icons.email, 'Email', user.email, theme),
-          if (user.dateOfBirth != null)
-            _buildDetailRow(
-              Icons.cake,
-              'Birthday',
-              DateFormat.yMMMd().format(user.dateOfBirth!),
-              theme,
-            ),
+          _buildDetailRow(
+            Icons.email,
+            'Email',
+            user.email,
+            theme,
+          ),
           _buildDetailRow(
             Icons.calendar_today,
             'Joined',
-            DateFormat.yMMMd().format(user.createdAt),
+            DateTime.fromMillisecondsSinceEpoch(user.createdAt).toString(),
             theme,
           ),
-          if (user.profileUpdatedAt != null)
-            _buildDetailRow(
-              Icons.update,
-              'Last Updated',
-              DateFormat.yMMMd().format(user.profileUpdatedAt!),
-              theme,
-            ),
         ],
       ),
     );

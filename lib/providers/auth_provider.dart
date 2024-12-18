@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart' as rtdb;
 import '../models/user_model.dart';
 import '../utils/logger.dart';
 
@@ -10,7 +10,10 @@ final authProvider = StateNotifierProvider<AuthNotifier, AsyncValue<UserModel?>>
 
 class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
   final _auth = FirebaseAuth.instance;
-  final _firestore = FirebaseFirestore.instance;
+  final _database = rtdb.FirebaseDatabase.instance;
+  rtdb.DatabaseReference get _usersRef => _database.ref().child('users');
+  rtdb.DatabaseReference get _usernamesRef => _database.ref().child('usernames');
+  User? _currentUser;
 
   AuthNotifier() : super(const AsyncValue.loading()) {
     Logger.i('Initializing AuthNotifier');
@@ -18,58 +21,71 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
   }
 
   void _init() {
-    _auth.authStateChanges().listen((user) async {
+    _auth.authStateChanges().listen((user) {
       Logger.d('Auth state changed: ${user?.uid ?? 'No user'}');
-      if (user == null) {
-        state = const AsyncValue.data(null);
-      } else {
-        try {
-          final userData = await _firestore.collection('users').doc(user.uid).get();
-          Logger.d('Fetched user data: ${userData.exists ? 'exists' : 'does not exist'}');
-          if (userData.exists) {
-            state = AsyncValue.data(UserModel.fromJson(userData.data()!));
-          } else {
-            state = const AsyncValue.data(null);
-          }
-        } catch (e) {
-          Logger.e('Error fetching user data', e);
-          state = AsyncValue.error(e, StackTrace.current);
-        }
-      }
+      _currentUser = user;
+      _fetchUserData();
     });
   }
 
+  Future<void> _fetchUserData() async {
+    if (_currentUser == null) {
+      if (mounted) state = const AsyncValue.data(null);
+      return;
+    }
+
+    try {
+      final userRef = _usersRef.child(_currentUser!.uid);
+      final snapshot = await userRef.get();
+      Logger.d('Fetched user data: ${snapshot.exists ? 'exists' : 'does not exist'}');
+      
+      if (!mounted) return;
+
+      if (snapshot.exists && snapshot.value != null) {
+        final userData = Map<String, dynamic>.from(snapshot.value as Map);
+        userData['id'] = _currentUser!.uid; // Ensure ID is set
+        state = AsyncValue.data(UserModel.fromJson(userData));
+      } else {
+        state = const AsyncValue.data(null);
+      }
+    } catch (e, stack) {
+      Logger.e('Error fetching user data', e);
+      if (mounted) state = AsyncValue.error(e, stack);
+    }
+  }
+
   Future<bool> isUsernameAvailable(String username) async {
-    if (username.length < 3) return false;
-    if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(username)) return false;
-    
-    final usernameDoc = await _firestore
-        .collection('usernames')
-        .doc(username.toLowerCase())
+    try {
+      // Basic validation
+      if (username.length < 3) return false;
+      if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(username)) return false;
+      
+      // Check in Realtime Database
+      final lowercaseUsername = username.toLowerCase();
+      final snapshot = await _database.ref()
+        .child('usernames')
+        .child(lowercaseUsername)
         .get();
-    return !usernameDoc.exists;
+      
+      return !snapshot.exists;
+    } catch (e) {
+      Logger.e('Error checking username availability', e);
+      rethrow;
+    }
   }
 
   Future<void> signUp({
-    required String username,
     required String email,
     required String password,
+    required String username,
+    String? photoUrl,
   }) async {
     try {
       state = const AsyncValue.loading();
       
-      // Validate username
-      if (username.length < 3) {
-        throw 'Username must be at least 3 characters long';
-      }
-      if (!RegExp(r'^[a-zA-Z0-9_]+$').hasMatch(username)) {
-        throw 'Username can only contain letters, numbers, and underscores';
-      }
-      
-      // Check if username is available
-      final isAvailable = await isUsernameAvailable(username);
-      if (!isAvailable) {
-        throw 'Username is already taken';
+      // Check username availability
+      if (!await isUsernameAvailable(username)) {
+        throw Exception('Username is already taken');
       }
 
       // Create auth user
@@ -78,111 +94,117 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
         password: password,
       );
 
-      // Create user document
-      final user = UserModel(
-        id: userCredential.user!.uid,
-        username: username.toLowerCase(),
+      final user = userCredential.user;
+      if (user == null) throw Exception('Failed to create user');
+
+      // Create user data
+      final userData = UserModel(
+        id: user.uid,
         email: email,
-        createdAt: DateTime.now(),
+        username: username,
+        photoUrl: photoUrl,
+        createdAt: DateTime.now().millisecondsSinceEpoch,
+        followersCount: 0,
+        followingCount: 0,
+        postsCount: 0,
       );
 
-      // Use a batch write for atomicity
-      final batch = _firestore.batch();
-      
-      // Create user document
-      batch.set(_firestore.collection('users').doc(user.id), user.toJson());
-      
+      // Save user data
+      await _usersRef.child(user.uid).set(userData.toJson());
+
       // Reserve username
-      batch.set(_firestore.collection('usernames').doc(username.toLowerCase()), {
-        'uid': user.id,
-        'createdAt': FieldValue.serverTimestamp(),
+      await _usernamesRef.child(username.toLowerCase()).set({
+        'uid': user.uid,
+        'timestamp': rtdb.ServerValue.timestamp,
       });
 
-      await batch.commit();
-      state = AsyncValue.data(user);
-    } catch (e) {
-      final errorMessage = e is FirebaseAuthException ? e.message ?? e.toString() : e.toString();
-      state = AsyncValue.error(errorMessage, StackTrace.current);
-      throw errorMessage;
+      state = AsyncValue.data(userData);
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      rethrow;
     }
   }
 
-  Future<void> signIn(String email, String password) async {
+  Future<void> signIn({required String email, required String password}) async {
     try {
-      Logger.i('Attempting sign in for email: $email');
       state = const AsyncValue.loading();
-      
-      await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      Logger.i('Sign in successful');
-    } on FirebaseAuthException catch (e) {
-      String errorMessage = 'An error occurred during sign in';
-      switch (e.code) {
-        case 'user-not-found':
-          errorMessage = 'No user found with this email';
-          break;
-        case 'wrong-password':
-          errorMessage = 'Wrong password provided';
-          break;
-        case 'invalid-email':
-          errorMessage = 'Invalid email address';
-          break;
-        default:
-          errorMessage = e.message ?? errorMessage;
-      }
-      Logger.e('Sign in failed', e, StackTrace.current);
-      state = AsyncValue.error(errorMessage, StackTrace.current);
-      throw errorMessage;
-    } catch (e) {
-      Logger.e('Unexpected error during sign in', e, StackTrace.current);
-      final errorMessage = e.toString();
-      state = AsyncValue.error(errorMessage, StackTrace.current);
-      throw errorMessage;
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      rethrow;
     }
   }
 
   Future<void> signOut() async {
-    await _auth.signOut();
+    try {
+      await _auth.signOut();
+      state = const AsyncValue.data(null);
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      rethrow;
+    }
   }
 
-  Future<void> updateProfile({
-    required String userId,
-    String? name,
-    String? photoUrl,
-    DateTime? dateOfBirth,
-    String? about,
-  }) async {
+  Future<void> updateProfile({String? username, String? photoUrl}) async {
     try {
-      Logger.i('Updating profile for user: $userId');
-      state = const AsyncValue.loading();
+      final currentUser = state.value;
+      if (currentUser == null) throw Exception('No user logged in');
 
-      // Get current user data
-      final userData = await _firestore.collection('users').doc(userId).get();
-      if (!userData.exists) {
-        throw 'User document not found';
+      final updates = <String, dynamic>{};
+      
+      if (username != null && username != currentUser.username) {
+        if (!await isUsernameAvailable(username)) {
+          throw Exception('Username is already taken');
+        }
+        updates['username'] = username;
+        
+        // Update username mapping
+        await _usernamesRef.child(currentUser.username.toLowerCase()).remove();
+        await _usernamesRef.child(username.toLowerCase()).set({
+          'uid': currentUser.id,
+          'timestamp': rtdb.ServerValue.timestamp,
+        });
       }
 
-      // Create updated user model
-      final currentUser = UserModel.fromJson(userData.data()!);
-      final updatedUser = currentUser.copyWith(
-        name: name,
-        photoUrl: photoUrl,
-        dateOfBirth: dateOfBirth,
-        about: about,
-      );
+      if (photoUrl != null) {
+        updates['photoUrl'] = photoUrl;
+      }
 
-      // Update in Firestore
-      await _firestore.collection('users').doc(userId).update(updatedUser.toJson());
+      if (updates.isNotEmpty) {
+        await _usersRef.child(currentUser.id).update(updates);
+        
+        state = AsyncValue.data(currentUser.copyWith(
+          username: username ?? currentUser.username,
+          photoUrl: photoUrl ?? currentUser.photoUrl,
+        ));
+      }
+    } catch (e, stack) {
+      state = AsyncValue.error(e, stack);
+      rethrow;
+    }
+  }
 
-      // Update state
-      state = AsyncValue.data(updatedUser);
-      Logger.i('Profile updated successfully');
+  Future<void> updateFollowersCount(String userId, int delta) async {
+    try {
+      final userRef = _usersRef.child(userId).child('followersCount');
+      await userRef.runTransaction((Object? value) {
+        return rtdb.Transaction.success((value as int? ?? 0) + delta);
+      });
     } catch (e) {
-      Logger.e('Error updating profile', e);
-      state = AsyncValue.error(e, StackTrace.current);
-      throw e.toString();
+      Logger.e('Error updating followers count', e);
+      rethrow;
+    }
+  }
+
+  Future<void> updateFollowingCount(String userId, int delta) async {
+    try {
+      final userRef = _usersRef.child(userId).child('followingCount');
+      await userRef.runTransaction((Object? value) {
+        return rtdb.Transaction.success((value as int? ?? 0) + delta);
+      });
+    } catch (e) {
+      Logger.e('Error updating following count', e);
+      rethrow;
     }
   }
 }

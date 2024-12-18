@@ -1,39 +1,76 @@
 class PostModel {
   final String id;
   final String userId;
+  final String username;
+  final String? userPhotoUrl;
   final String content;
   final String? imageUrl;
-  final DateTime createdAt;
-  final List<String> likes;
-  final List<String> comments;
+  final bool isMeme;
+  final int likes;
+  final int comments;
+  final int timestamp;
 
   PostModel({
     required this.id,
     required this.userId,
+    required this.username,
+    this.userPhotoUrl,
     required this.content,
     this.imageUrl,
-    required this.createdAt,
-    this.likes = const [],
-    this.comments = const [],
+    this.isMeme = false,
+    required this.likes,
+    required this.comments,
+    required this.timestamp,
   });
 
-  Map<String, dynamic> toJson() => {
-        'id': id,
-        'userId': userId,
-        'content': content,
-        'imageUrl': imageUrl,
-        'createdAt': createdAt.toIso8601String(),
-        'likes': likes,
-        'comments': comments,
-      };
+  factory PostModel.fromJson(Map<String, dynamic> json) {
+    return PostModel(
+      id: json['id'] as String,
+      userId: json['userId'] as String,
+      username: json['username'] as String,
+      userPhotoUrl: json['userPhotoUrl'] as String?,
+      content: json['content'] as String,
+      imageUrl: json['imageUrl'] as String?,
+      isMeme: json['isMeme'] as bool? ?? false,
+      likes: json['likes'] as int? ?? 0,
+      comments: json['comments'] as int? ?? 0,
+      timestamp: json['timestamp'] as int,
+    );
+  }
 
-  factory PostModel.fromJson(Map<String, dynamic> json) => PostModel(
-        id: json['id'],
-        userId: json['userId'],
-        content: json['content'],
-        imageUrl: json['imageUrl'],
-        createdAt: DateTime.parse(json['createdAt']),
-        likes: List<String>.from(json['likes'] ?? []),
-        comments: List<String>.from(json['comments'] ?? []),
-      );
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'userId': userId,
+      'username': username,
+      'userPhotoUrl': userPhotoUrl,
+      'content': content,
+      'imageUrl': imageUrl,
+      'isMeme': isMeme,
+      'likes': likes,
+      'comments': comments,
+      'timestamp': timestamp,
+    };
+  }
+
+  PostModel copyWith({
+    String? content,
+    String? imageUrl,
+    bool? isMeme,
+    int? likes,
+    int? comments,
+  }) {
+    return PostModel(
+      id: id,
+      userId: userId,
+      username: username,
+      userPhotoUrl: userPhotoUrl,
+      content: content ?? this.content,
+      imageUrl: imageUrl ?? this.imageUrl,
+      isMeme: isMeme ?? this.isMeme,
+      likes: likes ?? this.likes,
+      comments: comments ?? this.comments,
+      timestamp: timestamp,
+    );
+  }
 }
