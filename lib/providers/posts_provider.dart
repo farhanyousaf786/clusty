@@ -11,13 +11,51 @@ final postsProvider = StateNotifierProvider<PostsNotifier, AsyncValue<List<PostM
   return PostsNotifier(ref);
 });
 
+final userPostsProvider = StreamProvider.family<List<PostModel>, String?>((ref, userId) async* {
+  if (userId == null) {
+    yield [];
+    return;
+  }
+
+  final database = rtdb.FirebaseDatabase.instance;
+  final userPostsRef = database.ref().child('user-posts').child(userId);
+
+  try {
+    await for (final event in userPostsRef.onValue) {
+      if (!event.snapshot.exists || event.snapshot.value == null) {
+        yield [];
+        continue;
+      }
+
+      final postsData = Map<String, dynamic>.from(event.snapshot.value as Map);
+      final posts = postsData.entries.map((entry) {
+        final postData = Map<String, dynamic>.from(entry.value as Map);
+        postData['id'] = entry.key;
+        postData['userId'] = userId;
+        return PostModel.fromJson(postData);
+      }).toList();
+
+      // Sort posts by timestamp in descending order (newest first)
+      posts.sort((a, b) => (b.timestamp ?? 0).compareTo(a.timestamp ?? 0));
+      
+      yield posts;
+    }
+  } catch (e, stack) {
+    Logger.e('Error fetching user posts', e, stack);
+    yield* Stream.error(e, stack);
+  }
+});
+
 class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
   final Ref _ref;
   final _database = rtdb.FirebaseDatabase.instance;
   final _storage = FirebaseStorage.instance;
   rtdb.DatabaseReference get _postsRef => _database.ref().child('posts');
+  rtdb.DatabaseReference get _userPostsRef => _database.ref().child('user-posts');
+  rtdb.DatabaseReference get _followingRef => _database.ref().child('following');
   List<PostModel> _posts = [];
   rtdb.DatabaseReference? _currentListener;
+  Map<String, rtdb.DatabaseReference> _followingListeners = {};
 
   PostsNotifier(this._ref) : super(const AsyncValue.loading()) {
     _initPostsListener();
@@ -30,35 +68,34 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
       return;
     }
 
-    // Remove previous listener if exists
+    // Remove previous listeners
     _currentListener?.onValue.drain();
     _currentListener = null;
+    _followingListeners.values.forEach((listener) => listener.onValue.drain());
+    _followingListeners.clear();
 
-    // Set up new listener
-    final query = _postsRef.orderByChild('timestamp');
-    query.onValue.listen((event) {
+    // Listen to all posts
+    _postsRef.onValue.listen((event) async {
       try {
-        final postsData = event.snapshot.value as Map?;
-        if (postsData == null) {
-          _posts = [];
-          state = const AsyncValue.data([]);
-          return;
+        List<PostModel> allPosts = [];
+
+        if (event.snapshot.exists && event.snapshot.value != null) {
+          final postsData = Map<String, dynamic>.from(event.snapshot.value as Map);
+          final posts = postsData.entries.map((entry) {
+            final postData = Map<String, dynamic>.from(entry.value as Map);
+            postData['id'] = entry.key;
+            return PostModel.fromJson(postData);
+          }).toList();
+          allPosts.addAll(posts);
         }
 
-        _posts = postsData.entries.map((entry) {
-          final postData = Map<String, dynamic>.from(entry.value as Map);
-          postData['id'] = entry.key;
-          return PostModel.fromJson(postData);
-        }).toList();
-
-        // Sort by timestamp descending
-        _posts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
-        state = AsyncValue.data(_posts);
+        // Sort posts by timestamp
+        allPosts.sort((a, b) => (b.timestamp ?? 0).compareTo(a.timestamp ?? 0));
+        state = AsyncValue.data(allPosts);
       } catch (e, stack) {
+        Logger.e('Error in posts listener', e, stack);
         state = AsyncValue.error(e, stack);
       }
-    }, onError: (error, stack) {
-      state = AsyncValue.error(error, stack);
     });
   }
 
@@ -85,9 +122,12 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
         if (imageUrl == null) throw Exception('Failed to upload image');
       }
 
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       final newPostRef = _postsRef.push();
+      final postId = newPostRef.key!;
+      
       final post = PostModel(
-        id: newPostRef.key!,
+        id: postId,
         userId: currentUser.id,
         username: currentUser.username,
         userPhotoUrl: currentUser.photoUrl,
@@ -96,18 +136,29 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
         isMeme: isMeme,
         likes: 0,
         comments: 0,
-        timestamp: DateTime.now().millisecondsSinceEpoch,
+        timestamp: timestamp,
       );
 
-      await newPostRef.set(post.toJson());
+      // Create a multi-path update
+      final updates = {
+        '/posts/$postId': post.toJson(),
+        '/user-posts/${currentUser.id}/$postId': post.toJson(),
+      };
 
-      // Update user's post count
+      // Update all paths atomically
+      await _database.ref().update(updates);
+
+      // Update user's post count in a transaction
       final userRef = _database.ref().child('users/${currentUser.id}');
       await userRef.child('postsCount').runTransaction((Object? value) {
         return rtdb.Transaction.success((value as int? ?? 0) + 1);
       });
+
+      Logger.i('Post created successfully: $postId');
     } catch (e, stack) {
+      Logger.e('Error creating post', e, stack);
       state = AsyncValue.error(e, stack);
+      rethrow;
     }
   }
 
@@ -198,6 +249,81 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
     } catch (e) {
       Logger.e('Error checking like status', e);
       return false;
+    }
+  }
+
+  Future<bool> isFollowing(String userId) async {
+    try {
+      final currentUser = _ref.read(authProvider).value;
+      if (currentUser == null) return false;
+
+      final followingRef = _database.ref()
+          .child('users')
+          .child(currentUser.id)
+          .child('following')
+          .child(userId);
+      
+      final snapshot = await followingRef.get();
+      return snapshot.exists;
+    } catch (e) {
+      Logger.e('Error checking follow status', e);
+      return false;
+    }
+  }
+
+  Future<void> followUser(String userId) async {
+    try {
+      final currentUser = _ref.read(authProvider).value;
+      if (currentUser == null) throw Exception('Not logged in');
+
+      // Add to current user's following
+      await _database.ref()
+          .child('users')
+          .child(currentUser.id)
+          .child('following')
+          .child(userId)
+          .set(true);
+
+      // Add to target user's followers
+      await _database.ref()
+          .child('users')
+          .child(userId)
+          .child('followers')
+          .child(currentUser.id)
+          .set(true);
+
+      Logger.i('Successfully followed user: $userId');
+    } catch (e) {
+      Logger.e('Error following user', e);
+      rethrow;
+    }
+  }
+
+  Future<void> unfollowUser(String userId) async {
+    try {
+      final currentUser = _ref.read(authProvider).value;
+      if (currentUser == null) throw Exception('Not logged in');
+
+      // Remove from current user's following
+      await _database.ref()
+          .child('users')
+          .child(currentUser.id)
+          .child('following')
+          .child(userId)
+          .remove();
+
+      // Remove from target user's followers
+      await _database.ref()
+          .child('users')
+          .child(userId)
+          .child('followers')
+          .child(currentUser.id)
+          .remove();
+
+      Logger.i('Successfully unfollowed user: $userId');
+    } catch (e) {
+      Logger.e('Error unfollowing user', e);
+      rethrow;
     }
   }
 }

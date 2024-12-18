@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/user_provider.dart';
+import '../providers/posts_provider.dart';
 import '../utils/logger.dart';
 import 'package:intl/intl.dart';
 import 'package:image_picker/image_picker.dart';
@@ -9,7 +11,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/user_model.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
-  const ProfileScreen({super.key});
+  final String? userId;
+  const ProfileScreen({this.userId, super.key});
 
   @override
   ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
@@ -20,11 +23,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _nameController = TextEditingController();
   bool _isEditing = false;
   bool _isLoading = false;
+  bool _showPosts = false;
 
   @override
   void dispose() {
     _nameController.dispose();
     super.dispose();
+  }
+
+  void _togglePosts() {
+    setState(() {
+      _showPosts = !_showPosts;
+    });
   }
 
   void _startEditing(user) {
@@ -97,9 +107,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final userState = ref.watch(authProvider);
     final theme = ref.watch(themeProvider);
+    final userState = widget.userId != null
+        ? ref.watch(userProvider(widget.userId!))
+        : ref.watch(authProvider);
     final size = MediaQuery.of(context).size;
+
+    // Hide edit button for other users' profiles
+    final isCurrentUser = widget.userId == null || widget.userId == ref.read(authProvider).value?.id;
 
     return userState.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -250,10 +265,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     onPressed: () =>
                         ref.read(themeProvider.notifier).toggleTheme(),
                   ),
-                  if (!_isEditing)
+                  if (isCurrentUser)
                     IconButton(
-                      icon: Icon(Icons.edit, color: theme.primaryColor),
-                      onPressed: () => _startEditing(user),
+                      icon: Icon(
+                        _isEditing ? Icons.close : Icons.edit,
+                        color: theme.primaryColor,
+                      ),
+                      onPressed: () {
+                        if (_isEditing) {
+                          setState(() => _isEditing = false);
+                        } else {
+                          _startEditing(user);
+                        }
+                      },
                     ),
                   IconButton(
                     icon: Icon(Icons.logout, color: theme.primaryColor),
@@ -261,31 +285,149 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ],
               ),
-              SliverToBoxAdapter(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: theme.scaffoldBackgroundColor,
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(30)),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (_isEditing) ...[
-                          _buildEditForm(user, theme),
-                        ] else ...[
-                          _buildStats(user, theme),
-                          const SizedBox(height: 30),
-                          _buildAboutSection(user, theme),
-                          const SizedBox(height: 30),
-                          _buildDetailsSection(user, theme),
-                        ],
-                      ],
+              SliverList(
+                delegate: SliverChildListDelegate([
+                  if (!_isEditing) ...[
+                    _buildStats(user, theme),
+                    const SizedBox(height: 30),
+                    _buildAboutSection(user, theme),
+                    const SizedBox(height: 30),
+                    _buildDetailsSection(user, theme),
+                    const SizedBox(height: 30),
+                    // Posts Section Header with Toggle
+                    InkWell(
+                      onTap: _togglePosts,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Row(
+                          children: [
+                            Text(
+                              'My Posts',
+                              style: GoogleFonts.poppins(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: theme.textTheme.titleLarge?.color,
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(
+                              _showPosts ? Icons.expand_less : Icons.expand_more,
+                              color: theme.primaryColor,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                    // Posts Section Content
+                    if (_showPosts)
+                      Consumer(
+                        builder: (context, ref, child) {
+                          final userPosts = ref.watch(userPostsProvider(widget.userId));
+                          
+                          return userPosts.when(
+                            data: (posts) {
+                              if (posts.isEmpty) {
+                                return Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(20.0),
+                                    child: Text(
+                                      'No posts yet',
+                                      style: GoogleFonts.poppins(
+                                        color: theme.textTheme.bodyMedium?.color,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              
+                              return ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemCount: posts.length,
+                                itemBuilder: (context, index) {
+                                  final post = posts[index];
+                                  return Card(
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 16.0,
+                                      vertical: 8.0,
+                                    ),
+                                    color: theme.cardColor,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(16.0),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          if (post.imageUrl != null)
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(8.0),
+                                              child: Image.network(
+                                                post.imageUrl!,
+                                                fit: BoxFit.cover,
+                                                width: double.infinity,
+                                              ),
+                                            ),
+                                          const SizedBox(height: 8.0),
+                                          Text(
+                                            post.content,
+                                            style: GoogleFonts.poppins(
+                                              color: theme.textTheme.bodyLarge?.color,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8.0),
+                                          Row(
+                                            children: [
+                                              Icon(
+                                                Icons.favorite,
+                                                color: theme.primaryColor,
+                                                size: 16,
+                                              ),
+                                              const SizedBox(width: 4.0),
+                                              Text(
+                                                '${post.likes}',
+                                                style: GoogleFonts.poppins(
+                                                  color: theme.textTheme.bodyMedium?.color,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 16.0),
+                                              Icon(
+                                                Icons.comment,
+                                                color: theme.primaryColor,
+                                                size: 16,
+                                              ),
+                                              const SizedBox(width: 4.0),
+                                              Text(
+                                                '${post.comments}',
+                                                style: GoogleFonts.poppins(
+                                                  color: theme.textTheme.bodyMedium?.color,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                            loading: () => const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(20.0),
+                                child: CircularProgressIndicator(),
+                              ),
+                            ),
+                            error: (error, stack) => Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(20.0),
+                                child: Text('Error: $error'),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                  ] else
+                    _buildEditForm(user, theme),
+                ]),
               ),
             ],
           ),
