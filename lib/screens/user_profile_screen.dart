@@ -327,14 +327,26 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                           if (posts.isEmpty) {
                             return SliverToBoxAdapter(
                               child: Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(20.0),
+                                child: Container(
+                                  margin: const EdgeInsets.only(top: 20),
+                                  padding: const EdgeInsets.all(20),
+                                  decoration: BoxDecoration(
+                                    color: theme.cardColor,
+                                    borderRadius: BorderRadius.circular(15),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: theme.shadowColor.withOpacity(0.1),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 5),
+                                      ),
+                                    ],
+                                  ),
                                   child: Column(
                                     children: [
                                       Icon(
                                         Icons.post_add_rounded,
                                         size: 48,
-                                        color: theme.textTheme.bodyMedium?.color?.withOpacity(0.5),
+                                        color: theme.primaryColor.withOpacity(0.5),
                                       ),
                                       const SizedBox(height: 10),
                                       Text(
@@ -342,6 +354,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                         style: GoogleFonts.poppins(
                                           color: theme.textTheme.bodyMedium?.color,
                                           fontSize: 16,
+                                          fontWeight: FontWeight.w500,
                                         ),
                                       ),
                                     ],
@@ -355,13 +368,19 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             delegate: SliverChildBuilderDelegate(
                               (context, index) {
                                 final post = posts[index];
-                                return Card(
+                                return Container(
                                   margin: const EdgeInsets.only(bottom: 15),
-                                  shape: RoundedRectangleBorder(
+                                  decoration: BoxDecoration(
+                                    color: theme.cardColor,
                                     borderRadius: BorderRadius.circular(15),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: theme.shadowColor.withOpacity(0.1),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 5),
+                                      ),
+                                    ],
                                   ),
-                                  elevation: 5,
-                                  shadowColor: theme.shadowColor.withOpacity(0.1),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -370,14 +389,25 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                           borderRadius: const BorderRadius.vertical(
                                             top: Radius.circular(15),
                                           ),
-                                          child: Image.network(
-                                            post.imageUrl!,
-                                            width: double.infinity,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) {
-                                              Logger.e('Error loading image', error, stackTrace);
-                                              return const SizedBox.shrink();
-                                            },
+                                          child: AspectRatio(
+                                            aspectRatio: 16 / 9,
+                                            child: Image.network(
+                                              post.imageUrl!,
+                                              fit: BoxFit.cover,
+                                              errorBuilder: (context, error, stackTrace) {
+                                                Logger.e('Error loading image', error, stackTrace);
+                                                return Container(
+                                                  color: theme.primaryColor.withOpacity(0.1),
+                                                  child: Center(
+                                                    child: Icon(
+                                                      Icons.error_outline,
+                                                      color: theme.primaryColor,
+                                                      size: 32,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                            ),
                                           ),
                                         ),
                                       Padding(
@@ -385,20 +415,55 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            if (post.timestamp != null)
-                                              Text(
-                                                _formatDate(post.timestamp!),
-                                                style: GoogleFonts.poppins(
-                                                  color: theme.textTheme.bodySmall?.color,
-                                                  fontSize: 12,
+                                            Row(
+                                              children: [
+                                                CircleAvatar(
+                                                  radius: 16,
+                                                  backgroundColor: theme.primaryColor.withOpacity(0.1),
+                                                  backgroundImage: user.photoUrl != null
+                                                      ? NetworkImage(user.photoUrl!)
+                                                      : null,
+                                                  child: user.photoUrl == null
+                                                      ? Text(
+                                                          user.username[0].toUpperCase(),
+                                                          style: GoogleFonts.poppins(
+                                                            color: theme.primaryColor,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        )
+                                                      : null,
                                                 ),
-                                              ),
-                                            const SizedBox(height: 8),
+                                                const SizedBox(width: 8),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        user.username,
+                                                        style: GoogleFonts.poppins(
+                                                          fontWeight: FontWeight.w600,
+                                                          color: theme.textTheme.titleMedium?.color,
+                                                        ),
+                                                      ),
+                                                      if (post.timestamp != null)
+                                                        Text(
+                                                          _formatDate(post.timestamp!),
+                                                          style: GoogleFonts.poppins(
+                                                            color: theme.textTheme.bodySmall?.color,
+                                                            fontSize: 12,
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 12),
                                             Text(
                                               post.content,
                                               style: GoogleFonts.poppins(
                                                 color: theme.textTheme.bodyLarge?.color,
-                                                fontSize: 16,
+                                                fontSize: 15,
                                                 height: 1.5,
                                               ),
                                             ),
@@ -409,12 +474,18 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                                   Icons.favorite_rounded,
                                                   post.likes ?? 0,
                                                   theme,
+                                                  onTap: () {
+                                                    // TODO: Implement like functionality
+                                                  },
                                                 ),
                                                 const SizedBox(width: 20),
                                                 _buildPostStat(
                                                   Icons.comment_rounded,
                                                   post.comments ?? 0,
                                                   theme,
+                                                  onTap: () {
+                                                    // TODO: Implement comment functionality
+                                                  },
                                                 ),
                                               ],
                                             ),
@@ -441,13 +512,46 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                           Logger.e('Error loading posts', error, stack);
                           return SliverToBoxAdapter(
                             child: Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(20.0),
-                                child: Text(
-                                  'Error loading posts: $error',
-                                  style: GoogleFonts.poppins(
-                                    color: theme.textTheme.bodyMedium?.color,
-                                  ),
+                              child: Container(
+                                margin: const EdgeInsets.only(top: 20),
+                                padding: const EdgeInsets.all(20),
+                                decoration: BoxDecoration(
+                                  color: theme.cardColor,
+                                  borderRadius: BorderRadius.circular(15),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: theme.shadowColor.withOpacity(0.1),
+                                      blurRadius: 10,
+                                      offset: const Offset(0, 5),
+                                    ),
+                                  ],
+                                ),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.error_outline,
+                                      size: 48,
+                                      color: theme.colorScheme.error,
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'Error loading posts',
+                                      style: GoogleFonts.poppins(
+                                        color: theme.textTheme.bodyMedium?.color,
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 5),
+                                    Text(
+                                      error.toString(),
+                                      style: GoogleFonts.poppins(
+                                        color: theme.textTheme.bodySmall?.color,
+                                        fontSize: 14,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -499,23 +603,36 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     );
   }
 
-  Widget _buildPostStat(IconData icon, int count, ThemeData theme) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          color: theme.primaryColor,
-          size: 20,
+  Widget _buildPostStat(IconData icon, int count, ThemeData theme, {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: theme.primaryColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
         ),
-        const SizedBox(width: 4),
-        Text(
-          count.toString(),
-          style: GoogleFonts.poppins(
-            color: theme.textTheme.bodyMedium?.color,
-            fontSize: 14,
-          ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: theme.primaryColor,
+              size: 18,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              count.toString(),
+              style: GoogleFonts.poppins(
+                color: theme.primaryColor,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }

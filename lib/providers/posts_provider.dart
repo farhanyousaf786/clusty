@@ -292,6 +292,24 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
           .child(currentUser.id)
           .set(true);
 
+      // Update current user's following count
+      await _database.ref()
+          .child('users')
+          .child(currentUser.id)
+          .child('followingCount')
+          .runTransaction((Object? value) {
+        return rtdb.Transaction.success((value as int? ?? 0) + 1);
+      });
+
+      // Update target user's followers count
+      await _database.ref()
+          .child('users')
+          .child(userId)
+          .child('followersCount')
+          .runTransaction((Object? value) {
+        return rtdb.Transaction.success((value as int? ?? 0) + 1);
+      });
+
       Logger.i('Successfully followed user: $userId');
     } catch (e) {
       Logger.e('Error following user', e);
@@ -319,6 +337,26 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
           .child('followers')
           .child(currentUser.id)
           .remove();
+
+      // Update current user's following count
+      await _database.ref()
+          .child('users')
+          .child(currentUser.id)
+          .child('followingCount')
+          .runTransaction((Object? value) {
+        final current = value as int? ?? 0;
+        return rtdb.Transaction.success(current > 0 ? current - 1 : 0);
+      });
+
+      // Update target user's followers count
+      await _database.ref()
+          .child('users')
+          .child(userId)
+          .child('followersCount')
+          .runTransaction((Object? value) {
+        final current = value as int? ?? 0;
+        return rtdb.Transaction.success(current > 0 ? current - 1 : 0);
+      });
 
       Logger.i('Successfully unfollowed user: $userId');
     } catch (e) {

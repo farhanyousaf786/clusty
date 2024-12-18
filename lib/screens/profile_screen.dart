@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import '../models/user_model.dart';
+import '../models/post_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/posts_provider.dart';
 import '../utils/logger.dart';
-import 'package:intl/intl.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../models/user_model.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   final String? userId;
@@ -24,10 +28,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _isEditing = false;
   bool _isLoading = false;
   bool _showPosts = false;
+  late TextEditingController _aboutController;
+
+  @override
+  void initState() {
+    super.initState();
+    _aboutController = TextEditingController();
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _aboutController.dispose();
     super.dispose();
   }
 
@@ -41,6 +53,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     setState(() {
       _isEditing = true;
       _nameController.text = user.username;
+      _aboutController.text = user.about ?? '';
     });
   }
 
@@ -105,10 +118,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
+  String _formatDate(int timestamp) {
+    final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    return DateFormat.yMMMd().format(date);
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = ref.watch(themeProvider);
-    final userState = widget.userId != null
+    final userStream = widget.userId != null
         ? ref.watch(userProvider(widget.userId!))
         : ref.watch(authProvider);
     final size = MediaQuery.of(context).size;
@@ -116,11 +134,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     // Hide edit button for other users' profiles
     final isCurrentUser = widget.userId == null || widget.userId == ref.read(authProvider).value?.id;
 
-    return userState.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (error, stack) => Center(child: Text('Error: $error')),
-      data: (user) {
-        if (user == null) return const Center(child: Text('Not logged in'));
+    return StreamBuilder(
+      stream: FirebaseDatabase.instance
+          .ref()
+          .child('users')
+          .child(widget.userId ?? ref.read(authProvider).value?.id ?? '')
+          .onValue,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        if (!snapshot.hasData || snapshot.data?.snapshot.value == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final userData = Map<String, dynamic>.from(snapshot.data!.snapshot.value as Map);
+        userData['id'] = widget.userId ?? ref.read(authProvider).value?.id;
+        final user = UserModel.fromJson(userData);
 
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
@@ -128,10 +159,65 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             physics: const BouncingScrollPhysics(),
             slivers: [
               SliverAppBar(
-                expandedHeight: size.height * 0.4,
+                expandedHeight: 200,
                 floating: false,
                 pinned: true,
-                backgroundColor: Colors.transparent,
+                stretch: true,
+                backgroundColor: theme.primaryColor,
+                actions: [
+                  PopupMenuButton<String>(
+                    icon: const Icon(
+                      Icons.edit_rounded,
+                      color: Colors.white,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    itemBuilder: (context) => [
+                      _buildPopupMenuItem(
+                        'Edit Profile Picture',
+                        Icons.image_rounded,
+                        'photo',
+                      ),
+                      _buildPopupMenuItem(
+                        'Edit Username',
+                        Icons.person_rounded,
+                        'username',
+                      ),
+                      _buildPopupMenuItem(
+                        'Edit Name',
+                        Icons.badge_rounded,
+                        'name',
+                      ),
+                      _buildPopupMenuItem(
+                        'Edit About',
+                        Icons.info_rounded,
+                        'about',
+                      ),
+                      _buildPopupMenuItem(
+                        'Edit Date of Birth',
+                        Icons.cake_rounded,
+                        'dob',
+                      ),
+                    ],
+                    onSelected: _showEditDialog,
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: Icon(
+                      ref.read(themeProvider.notifier).isDark
+                          ? Icons.light_mode
+                          : Icons.dark_mode,
+                      color: Colors.white,
+                    ),
+                    onPressed: () =>
+                        ref.read(themeProvider.notifier).toggleTheme(),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.logout, color: Colors.white),
+                    onPressed: () => ref.read(authProvider.notifier).signOut(),
+                  ),
+                ],
                 flexibleSpace: FlexibleSpaceBar(
                   background: Stack(
                     fit: StackFit.expand,
@@ -207,46 +293,45 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ),
                         ),
                       ),
-                      // Name and Status
+                      // Username and Profile Info
                       Positioned(
-                        bottom: 30,
+                        bottom: 35,
                         left: 140,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              user.username,
+                              '@${user.username}',
+                              style: GoogleFonts.poppins(
+                                fontSize: 16,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            Text(
+                              user.name ?? user.username,
                               style: GoogleFonts.poppins(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
-                                color: theme.textTheme.bodyLarge?.color,
-                                shadows: [
-                                  Shadow(
-                                    color: theme.shadowColor,
-                                    blurRadius: 10,
-                                  ),
-                                ],
+                                color: Colors.white,
                               ),
                             ),
-                            Row(
-                              children: [
-                                Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: Colors.green,
-                                    shape: BoxShape.circle,
-                                  ),
+                            if (user.dob != null) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                'Born ${_formatDate(user.dob!)}',
+                                style: GoogleFonts.poppins(
+                                  fontSize: 14,
+                                  color: Colors.white70,
                                 ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  'Online',
-                                  style: GoogleFonts.poppins(
-                                    color: theme.textTheme.bodyMedium?.color,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
+                              ),
+                            ],
+                            const SizedBox(height: 4),
+                            Text(
+                              'Joined ${_formatDate(user.createdAt)}',
+                              style: GoogleFonts.poppins(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
                             ),
                           ],
                         ),
@@ -254,36 +339,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ],
                   ),
                 ),
-                actions: [
-                  IconButton(
-                    icon: Icon(
-                      ref.read(themeProvider.notifier).isDark
-                          ? Icons.light_mode
-                          : Icons.dark_mode,
-                      color: theme.primaryColor,
-                    ),
-                    onPressed: () =>
-                        ref.read(themeProvider.notifier).toggleTheme(),
-                  ),
-                  if (isCurrentUser)
-                    IconButton(
-                      icon: Icon(
-                        _isEditing ? Icons.close : Icons.edit,
-                        color: theme.primaryColor,
-                      ),
-                      onPressed: () {
-                        if (_isEditing) {
-                          setState(() => _isEditing = false);
-                        } else {
-                          _startEditing(user);
-                        }
-                      },
-                    ),
-                  IconButton(
-                    icon: Icon(Icons.logout, color: theme.primaryColor),
-                    onPressed: () => ref.read(authProvider.notifier).signOut(),
-                  ),
-                ],
               ),
               SliverList(
                 delegate: SliverChildListDelegate([
@@ -328,13 +383,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             data: (posts) {
                               if (posts.isEmpty) {
                                 return Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(20.0),
-                                    child: Text(
-                                      'No posts yet',
-                                      style: GoogleFonts.poppins(
-                                        color: theme.textTheme.bodyMedium?.color,
-                                      ),
+                                  child: Text(
+                                    'No posts yet',
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 16,
+                                      color: Colors.grey,
                                     ),
                                   ),
                                 );
@@ -346,80 +399,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                 itemCount: posts.length,
                                 itemBuilder: (context, index) {
                                   final post = posts[index];
-                                  return Card(
-                                    margin: const EdgeInsets.symmetric(
-                                      horizontal: 16.0,
-                                      vertical: 8.0,
-                                    ),
-                                    color: theme.cardColor,
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(16.0),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          if (post.imageUrl != null)
-                                            ClipRRect(
-                                              borderRadius: BorderRadius.circular(8.0),
-                                              child: Image.network(
-                                                post.imageUrl!,
-                                                fit: BoxFit.cover,
-                                                width: double.infinity,
-                                              ),
-                                            ),
-                                          const SizedBox(height: 8.0),
-                                          Text(
-                                            post.content,
-                                            style: GoogleFonts.poppins(
-                                              color: theme.textTheme.bodyLarge?.color,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 8.0),
-                                          Row(
-                                            children: [
-                                              Icon(
-                                                Icons.favorite,
-                                                color: theme.primaryColor,
-                                                size: 16,
-                                              ),
-                                              const SizedBox(width: 4.0),
-                                              Text(
-                                                '${post.likes}',
-                                                style: GoogleFonts.poppins(
-                                                  color: theme.textTheme.bodyMedium?.color,
-                                                ),
-                                              ),
-                                              const SizedBox(width: 16.0),
-                                              Icon(
-                                                Icons.comment,
-                                                color: theme.primaryColor,
-                                                size: 16,
-                                              ),
-                                              const SizedBox(width: 4.0),
-                                              Text(
-                                                '${post.comments}',
-                                                style: GoogleFonts.poppins(
-                                                  color: theme.textTheme.bodyMedium?.color,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
+                                  return _buildPostCard(post, theme);
                                 },
                               );
                             },
                             loading: () => const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(20.0),
-                                child: CircularProgressIndicator(),
-                              ),
+                              child: CircularProgressIndicator(),
                             ),
                             error: (error, stack) => Center(
-                              child: Padding(
-                                padding: const EdgeInsets.all(20.0),
-                                child: Text('Error: $error'),
+                              child: Text(
+                                'Error loading posts: $error',
+                                style: GoogleFonts.poppins(
+                                  color: Colors.red,
+                                ),
                               ),
                             ),
                           );
@@ -622,7 +614,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           _buildDetailRow(
             Icons.calendar_today,
             'Joined',
-            DateTime.fromMillisecondsSinceEpoch(user.createdAt).toString(),
+            _formatDate(user.createdAt),
             theme,
           ),
         ],
@@ -659,5 +651,308 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildPostCard(PostModel post, ThemeData theme) {
+    return Card(
+      margin: const EdgeInsets.symmetric(
+        horizontal: 16.0,
+        vertical: 8.0,
+      ),
+      color: theme.cardColor,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (post.imageUrl != null)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8.0),
+                child: Image.network(
+                  post.imageUrl!,
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                ),
+              ),
+            const SizedBox(height: 8.0),
+            Text(
+              post.content,
+              style: GoogleFonts.poppins(
+                color: theme.textTheme.bodyLarge?.color,
+              ),
+            ),
+            const SizedBox(height: 8.0),
+            Row(
+              children: [
+                Icon(
+                  Icons.favorite,
+                  color: theme.primaryColor,
+                  size: 16,
+                ),
+                const SizedBox(width: 4.0),
+                Text(
+                  '${post.likes}',
+                  style: GoogleFonts.poppins(
+                    color: theme.textTheme.bodyMedium?.color,
+                  ),
+                ),
+                const SizedBox(width: 16.0),
+                Icon(
+                  Icons.comment,
+                  color: theme.primaryColor,
+                  size: 16,
+                ),
+                const SizedBox(width: 4.0),
+                Text(
+                  '${post.comments}',
+                  style: GoogleFonts.poppins(
+                    color: theme.textTheme.bodyMedium?.color,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _buildPopupMenuItem(String text, IconData icon, String value) {
+    return PopupMenuItem<String>(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: Theme.of(context).primaryColor),
+          const SizedBox(width: 12),
+          Text(
+            text,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditDialog(String field) {
+    final theme = Theme.of(context);
+    final user = ref.read(authProvider).value;
+    
+    final controller = TextEditingController(
+      text: field == 'username' 
+          ? user?.username
+          : field == 'name'
+              ? user?.name
+              : field == 'about'
+                  ? user?.about ?? ''
+                  : '',
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          'Edit ${field.substring(0, 1).toUpperCase()}${field.substring(1)}',
+          style: GoogleFonts.poppins(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (field == 'photo') ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildImageOptionButton(
+                    'Camera',
+                    Icons.camera_alt_rounded,
+                    () async {
+                      final image = await ImagePicker().pickImage(source: ImageSource.camera);
+                      if (image != null) {
+                        await _uploadImage(image.path);
+                        Navigator.pop(context);
+                      }
+                    },
+                  ),
+                  _buildImageOptionButton(
+                    'Gallery',
+                    Icons.photo_library_rounded,
+                    () async {
+                      final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+                      if (image != null) {
+                        await _uploadImage(image.path);
+                        Navigator.pop(context);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ] else if (field == 'dob')
+              TextButton(
+                onPressed: () {
+                  _pickDate(context);
+                  Navigator.pop(context);
+                },
+                child: Text(
+                  user?.dob != null 
+                      ? 'Current: ${_formatDate(user!.dob!)}\nTap to change'
+                      : 'Select Date',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    color: theme.primaryColor,
+                  ),
+                ),
+              )
+            else
+              TextField(
+                controller: controller,
+                maxLines: field == 'about' ? 4 : 1,
+                decoration: InputDecoration(
+                  hintText: 'Enter your ${field}',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                ),
+                style: GoogleFonts.poppins(),
+              ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.poppins(
+                color: theme.textTheme.bodyMedium?.color,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (field != 'photo' && field != 'dob' && controller.text.isNotEmpty) {
+                _updateField(field, controller.text);
+              }
+              Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+            ),
+            child: Text(
+              'Save',
+              style: GoogleFonts.poppins(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildImageOptionButton(String label, IconData icon, VoidCallback onTap) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(15),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: theme.primaryColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(15),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, size: 32, color: theme.primaryColor),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                color: theme.primaryColor,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickDate(BuildContext context) async {
+    final initialDate = DateTime.now();
+    final newDate = await showDatePicker(
+      context: context,
+      initialDate: initialDate.subtract(const Duration(days: 365 * 18)), // 18 years ago
+      firstDate: DateTime(1900),
+      lastDate: initialDate.subtract(const Duration(days: 365 * 13)), // 13 years ago
+    );
+    
+    if (newDate != null) {
+      await _updateField('dob', newDate.millisecondsSinceEpoch.toString());
+    }
+  }
+
+  Future<void> _uploadImage(String imagePath) async {
+    try {
+      final userData = ref.read(authProvider);
+      final userId = userData.when(
+        data: (user) => user?.id,
+        loading: () => null,
+        error: (_, __) => null,
+      );
+      
+      if (userId == null) return;
+
+      final storage = FirebaseStorage.instance;
+      final storageRef = storage.ref().child('user_photos/$userId.jpg');
+      await storageRef.putFile(File(imagePath));
+      final url = await storageRef.getDownloadURL();
+      
+      await _updateField('photoUrl', url);
+    } catch (e) {
+      Logger.e('Error uploading image', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error uploading image: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _updateField(String field, String value) async {
+    try {
+      final userData = ref.read(authProvider);
+      final userId = userData.when(
+        data: (user) => user?.id,
+        loading: () => null,
+        error: (_, __) => null,
+      );
+      
+      if (userId == null) return;
+
+      final database = FirebaseDatabase.instance;
+      await database.ref().child('users').child(userId).update({
+        field: value,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Successfully updated $field')),
+        );
+      }
+    } catch (e) {
+      Logger.e('Error updating $field', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error updating $field: $e')),
+        );
+      }
+    }
   }
 }
