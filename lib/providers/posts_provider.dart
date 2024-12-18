@@ -74,26 +74,51 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
     _followingListeners.values.forEach((listener) => listener.onValue.drain());
     _followingListeners.clear();
 
-    // Listen to all posts
-    _postsRef.onValue.listen((event) async {
+    // First, get the list of followed users
+    _database.ref()
+        .child('users')
+        .child(currentUser.id)
+        .child('following')
+        .onValue
+        .listen((event) async {
       try {
-        List<PostModel> allPosts = [];
-
+        Set<String> followedUsers = {};
+        
+        // Add current user to show their own posts
+        followedUsers.add(currentUser.id);
+        
+        // Add followed users
         if (event.snapshot.exists && event.snapshot.value != null) {
-          final postsData = Map<String, dynamic>.from(event.snapshot.value as Map);
-          final posts = postsData.entries.map((entry) {
-            final postData = Map<String, dynamic>.from(entry.value as Map);
-            postData['id'] = entry.key;
-            return PostModel.fromJson(postData);
-          }).toList();
-          allPosts.addAll(posts);
+          final followingData = Map<String, dynamic>.from(event.snapshot.value as Map);
+          followedUsers.addAll(followingData.keys);
         }
 
-        // Sort posts by timestamp
-        allPosts.sort((a, b) => (b.timestamp ?? 0).compareTo(a.timestamp ?? 0));
-        state = AsyncValue.data(allPosts);
+        // Listen to all posts
+        _postsRef.onValue.listen((event) async {
+          try {
+            List<PostModel> filteredPosts = [];
+
+            if (event.snapshot.exists && event.snapshot.value != null) {
+              final postsData = Map<String, dynamic>.from(event.snapshot.value as Map);
+              final posts = postsData.entries.map((entry) {
+                final postData = Map<String, dynamic>.from(entry.value as Map);
+                postData['id'] = entry.key;
+                return PostModel.fromJson(postData);
+              }).where((post) => followedUsers.contains(post.userId)).toList();
+              
+              filteredPosts.addAll(posts);
+            }
+
+            // Sort posts by timestamp
+            filteredPosts.sort((a, b) => (b.timestamp ?? 0).compareTo(a.timestamp ?? 0));
+            state = AsyncValue.data(filteredPosts);
+          } catch (e, stack) {
+            Logger.e('Error in posts listener', e, stack);
+            state = AsyncValue.error(e, stack);
+          }
+        });
       } catch (e, stack) {
-        Logger.e('Error in posts listener', e, stack);
+        Logger.e('Error in following listener', e, stack);
         state = AsyncValue.error(e, stack);
       }
     });
