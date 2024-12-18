@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "226076386151",
+    "project_id": "clusty",
+    "storage_bucket": "clusty.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:226076386151:android:fc91f56743d68a797885c2",
+        "android_client_info": {
+          "package_name": "com.stf.clusty"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBZOjkBhL_gH48aJZPWPZIdMkDp8fByKXw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
