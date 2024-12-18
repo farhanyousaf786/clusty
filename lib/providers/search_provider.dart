@@ -34,12 +34,12 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<UserModel>>> {
         userData['id'] = entry.key;
         return UserModel.fromJson(userData);
       }).where((user) {
-        final username = user.username.toLowerCase();
+        final username = user.username?.toLowerCase() ?? '';
         final searchQuery = query.toLowerCase();
         return username.contains(searchQuery);
       }).toList();
 
-      users.sort((a, b) => a.username.compareTo(b.username));
+      users.sort((a, b) => (a.username ?? '').compareTo((b.username ?? '')));
       state = AsyncValue.data(users);
       Logger.i('Found ${users.length} users matching "$query"');
     } catch (e, stack) {

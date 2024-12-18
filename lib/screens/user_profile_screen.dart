@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_database/firebase_database.dart';
+import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/user_provider.dart';
@@ -46,6 +48,328 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   String _formatDate(int timestamp) {
     final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
     return DateFormat('MMM d, y').format(date);
+  }
+
+  Color _getRatingColor(double rating) {
+    if (rating >= 4.5) return Colors.green.shade400;
+    if (rating >= 4.0) return Colors.lightGreen.shade400;
+    if (rating >= 3.0) return Colors.orange.shade400;
+    if (rating >= 2.0) return Colors.deepOrange.shade400;
+    return Colors.red.shade400;
+  }
+
+  Widget _buildRatingSection(UserModel user, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Profile Rating',
+            style: GoogleFonts.poppins(
+              color: theme.textTheme.bodyLarge?.color,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        user.rating.toStringAsFixed(1),
+                        style: GoogleFonts.poppins(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: _getRatingColor(user.rating),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'out of 5',
+                        style: GoogleFonts.poppins(
+                          color: theme.textTheme.bodyMedium?.color,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    '${user.ratingCount} ${user.ratingCount == 1 ? 'rating' : 'ratings'}',
+                    style: GoogleFonts.poppins(
+                      color: theme.textTheme.bodyMedium?.color,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: theme.dividerColor,
+                    width: 4,
+                  ),
+                ),
+                child: Center(
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 72,
+                        height: 72,
+                        child: CircularProgressIndicator(
+                          value: user.rating / 5,
+                          backgroundColor: theme.dividerColor.withOpacity(0.2),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _getRatingColor(user.rating),
+                          ),
+                          strokeWidth: 8,
+                        ),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.star,
+                            color: _getRatingColor(user.rating),
+                            size: 24,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 20),
+              if (ref.watch(authProvider).value != null && ref.watch(authProvider).value!.id != user.id)
+                ElevatedButton(
+                  onPressed: () => _showRatingDialog(user),
+                  style: ElevatedButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    backgroundColor: _getRatingColor(user.rating).withOpacity(0.1),
+                    foregroundColor: _getRatingColor(user.rating),
+                  ),
+                  child: Text(
+                    'Rate',
+                    style: GoogleFonts.poppins(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showRatingDialog(UserModel user) async {
+    final currentUser = ref.read(authProvider).value;
+    if (currentUser == null) return;
+
+    // Check last rating time
+    final ratingsRef = FirebaseDatabase.instance
+        .ref()
+        .child('ratings')
+        .child(user.id)
+        .child(currentUser.id);
+    
+    final snapshot = await ratingsRef.get();
+    if (snapshot.exists) {
+      final ratingData = Map<String, dynamic>.from(snapshot.value as Map);
+      final lastRatingTime = DateTime.fromMillisecondsSinceEpoch(
+        (ratingData['timestamp'] as int?) ?? 0
+      );
+      final timeSinceLastRating = DateTime.now().difference(lastRatingTime);
+      
+      if (timeSinceLastRating.inHours < 24) {
+        if (!mounted) return;
+        final hoursLeft = 24 - timeSinceLastRating.inHours;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'You can update your rating in $hoursLeft hours',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+    }
+
+    double selectedRating = snapshot.exists
+        ? (Map<String, dynamic>.from(snapshot.value as Map)['rating'] as num).toDouble()
+        : 5.0;
+
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            snapshot.exists ? 'Update Rating' : 'Rate ${user.name ?? user.username}',
+            style: GoogleFonts.poppins(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (snapshot.exists)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    'Your previous rating: ${selectedRating.toStringAsFixed(1)}',
+                    style: GoogleFonts.poppins(
+                      color: Theme.of(context).textTheme.bodyMedium?.color,
+                    ),
+                  ),
+                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (index) {
+                  final starRating = index + 1.0;
+                  return IconButton(
+                    onPressed: () {
+                      setState(() => selectedRating = starRating);
+                    },
+                    icon: Icon(
+                      starRating <= selectedRating 
+                          ? Icons.star 
+                          : Icons.star_border,
+                      color: _getRatingColor(selectedRating),
+                      size: 32,
+                    ),
+                  );
+                }),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                selectedRating.toStringAsFixed(1),
+                style: GoogleFonts.poppins(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: _getRatingColor(selectedRating),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.poppins(
+                  color: Theme.of(context).textTheme.bodyMedium?.color,
+                ),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                await _submitRating(user.id, selectedRating);
+                if (mounted) Navigator.pop(context);
+              },
+              style: ElevatedButton.styleFrom(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                backgroundColor: _getRatingColor(selectedRating).withOpacity(0.1),
+                foregroundColor: _getRatingColor(selectedRating),
+              ),
+              child: Text(
+                snapshot.exists ? 'Update' : 'Submit',
+                style: GoogleFonts.poppins(
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitRating(String userId, double rating) async {
+    try {
+      final currentUser = ref.read(authProvider).value;
+      if (currentUser == null) return;
+
+      final database = FirebaseDatabase.instance;
+      final userRef = database.ref().child('users').child(userId);
+      final ratingsRef = database.ref().child('ratings').child(userId);
+      
+      // Add or update the rating
+      await ratingsRef.child(currentUser.id).set({
+        'rating': rating,
+        'timestamp': ServerValue.timestamp,
+        'raterUsername': currentUser.username,
+        'raterPhotoUrl': currentUser.photoUrl,
+      });
+
+      // Calculate new average rating
+      final allRatingsSnapshot = await ratingsRef.get();
+      if (!allRatingsSnapshot.exists) return;
+      
+      final allRatings = Map<String, dynamic>.from(allRatingsSnapshot.value as Map);
+      double totalRating = 0;
+      int count = 0;
+      
+      allRatings.forEach((key, value) {
+        if (value is Map) {
+          final ratingData = Map<String, dynamic>.from(value as Map);
+          totalRating += (ratingData['rating'] as num).toDouble();
+          count++;
+        }
+      });
+      
+      final newRating = totalRating / count;
+      
+      // Update user's rating stats
+      await userRef.update({
+        'rating': newRating,
+        'ratingCount': count,
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Rating submitted!',
+              style: GoogleFonts.poppins(),
+            ),
+            backgroundColor: _getRatingColor(rating),
+          ),
+        );
+      }
+    } catch (e) {
+      Logger.e('Error submitting rating', e);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error submitting rating: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -123,18 +447,23 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                 backgroundImage: user.photoUrl != null
                                     ? NetworkImage(user.photoUrl!)
                                     : null,
-                                child: user.photoUrl == null
+                                child: user.username?.isNotEmpty == true
                                     ? Text(
-                                        user.username.isNotEmpty
-                                            ? user.username[0].toUpperCase()
-                                            : '',
+                                        user.username![0].toUpperCase(),
                                         style: GoogleFonts.poppins(
                                           fontSize: 40,
                                           fontWeight: FontWeight.bold,
                                           color: theme.primaryColor,
                                         ),
                                       )
-                                    : null,
+                                    : Text(
+                                        'U',
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 40,
+                                          fontWeight: FontWeight.bold,
+                                          color: theme.primaryColor,
+                                        ),
+                                      ),
                               ),
                             ),
                           ),
@@ -147,7 +476,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                user.username,
+                                user.username ?? 'Anonymous',
                                 style: GoogleFonts.poppins(
                                   fontSize: 24,
                                   fontWeight: FontWeight.bold,
@@ -189,6 +518,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                         ],
                       ),
                     ),
+
+                    // Rating Section
+                    _buildRatingSection(user, theme),
 
                     // Follow Button
                     if (currentUser != null && currentUser.id != user.id)
@@ -423,15 +755,23 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                                   backgroundImage: user.photoUrl != null
                                                       ? NetworkImage(user.photoUrl!)
                                                       : null,
-                                                  child: user.photoUrl == null
+                                                  child: user.username?.isNotEmpty == true
                                                       ? Text(
-                                                          user.username[0].toUpperCase(),
+                                                          user.username![0].toUpperCase(),
                                                           style: GoogleFonts.poppins(
-                                                            color: theme.primaryColor,
+                                                            fontSize: 14,
                                                             fontWeight: FontWeight.bold,
+                                                            color: theme.primaryColor,
                                                           ),
                                                         )
-                                                      : null,
+                                                      : Text(
+                                                          'U',
+                                                          style: GoogleFonts.poppins(
+                                                            fontSize: 14,
+                                                            fontWeight: FontWeight.bold,
+                                                            color: theme.primaryColor,
+                                                          ),
+                                                        ),
                                                 ),
                                                 const SizedBox(width: 8),
                                                 Expanded(
@@ -439,7 +779,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                                     crossAxisAlignment: CrossAxisAlignment.start,
                                                     children: [
                                                       Text(
-                                                        user.username,
+                                                        user.username ?? 'Anonymous',
                                                         style: GoogleFonts.poppins(
                                                           fontWeight: FontWeight.w600,
                                                           color: theme.textTheme.titleMedium?.color,

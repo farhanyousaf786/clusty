@@ -159,7 +159,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
         updates['username'] = username;
         
         // Update username mapping
-        await _usernamesRef.child(currentUser.username.toLowerCase()).remove();
+        if (currentUser.username?.isNotEmpty == true) {
+          await _usernamesRef.child(currentUser.username!.toLowerCase()).remove();
+        }
         await _usernamesRef.child(username.toLowerCase()).set({
           'uid': currentUser.id,
           'timestamp': rtdb.ServerValue.timestamp,

@@ -11,39 +11,29 @@ final postsProvider = StateNotifierProvider<PostsNotifier, AsyncValue<List<PostM
   return PostsNotifier(ref);
 });
 
-final userPostsProvider = StreamProvider.family<List<PostModel>, String?>((ref, userId) async* {
-  if (userId == null) {
-    yield [];
-    return;
-  }
-
-  final database = rtdb.FirebaseDatabase.instance;
-  final userPostsRef = database.ref().child('user-posts').child(userId);
-
-  try {
-    await for (final event in userPostsRef.onValue) {
-      if (!event.snapshot.exists || event.snapshot.value == null) {
-        yield [];
-        continue;
-      }
-
-      final postsData = Map<String, dynamic>.from(event.snapshot.value as Map);
-      final posts = postsData.entries.map((entry) {
-        final postData = Map<String, dynamic>.from(entry.value as Map);
-        postData['id'] = entry.key;
-        postData['userId'] = userId;
-        return PostModel.fromJson(postData);
-      }).toList();
-
-      // Sort posts by timestamp in descending order (newest first)
-      posts.sort((a, b) => (b.timestamp ?? 0).compareTo(a.timestamp ?? 0));
-      
-      yield posts;
-    }
-  } catch (e, stack) {
-    Logger.e('Error fetching user posts', e, stack);
-    yield* Stream.error(e, stack);
-  }
+final userPostsProvider = StreamProvider.family<List<PostModel>, String?>((ref, userId) {
+  if (userId == null) return Stream.value([]);
+  
+  return rtdb.FirebaseDatabase.instance
+      .ref()
+      .child('posts')
+      .orderByChild('userId')
+      .equalTo(userId)
+      .onValue
+      .map((event) {
+        if (event.snapshot.value == null) return [];
+        
+        final postsMap = Map<String, dynamic>.from(event.snapshot.value as Map);
+        final posts = postsMap.entries.map((entry) {
+          return PostModel.fromJson({
+            'id': entry.key,
+            ...Map<String, dynamic>.from(entry.value as Map),
+          });
+        }).toList();
+        
+        posts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+        return posts;
+      });
 });
 
 class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
@@ -154,7 +144,7 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
       final post = PostModel(
         id: postId,
         userId: currentUser.id,
-        username: currentUser.username,
+        username: currentUser.username ?? 'Anonymous',
         userPhotoUrl: currentUser.photoUrl,
         content: content,
         imageUrl: imageUrl,
@@ -226,7 +216,7 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
       
       await newCommentRef.set({
         'userId': currentUser.id,
-        'username': currentUser.username,
+        'username': currentUser.username ?? 'Anonymous',
         'userPhotoUrl': currentUser.photoUrl,
         'comment': comment,
         'timestamp': rtdb.ServerValue.timestamp,

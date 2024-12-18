@@ -137,7 +137,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             : null,
                         child: user.photoUrl == null
                             ? Text(
-                                user.username[0].toUpperCase(),
+                                user.username?[0].toUpperCase() ?? 'U',
                                 style: GoogleFonts.poppins(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,
@@ -146,7 +146,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             : null,
                       ),
                       title: Text(
-                        user.username,
+                        user.username ?? 'Anonymous',
                         style: GoogleFonts.poppins(
                           color: theme.textTheme.titleMedium?.color,
                           fontWeight: FontWeight.w600,

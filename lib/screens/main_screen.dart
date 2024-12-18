@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/theme_provider.dart';
 import '../providers/posts_provider.dart';
+import '../providers/user_provider.dart';
 import 'create_post_screen.dart';
 import 'search_screen.dart';
+import 'user_profile_screen.dart';
 
 class MainScreen extends ConsumerWidget {
   const MainScreen({super.key});
@@ -179,26 +181,62 @@ class MainScreen extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           ListTile(
-                            leading: CircleAvatar(
-                              backgroundImage: post.userPhotoUrl != null
-                                  ? NetworkImage(post.userPhotoUrl!)
-                                  : null,
-                              backgroundColor: theme.primaryColor,
-                              child: post.userPhotoUrl == null
-                                  ? Text(
-                                      post.username[0].toUpperCase(),
-                                      style: GoogleFonts.poppins(
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : null,
+                            leading: Consumer(
+                              builder: (context, ref, child) {
+                                final userAsync = ref.watch(userProvider(post.userId));
+                                return userAsync.when(
+                                  data: (user) => CircleAvatar(
+                                    backgroundImage: user?.photoUrl != null
+                                        ? NetworkImage(user!.photoUrl!)
+                                        : null,
+                                    backgroundColor: theme.primaryColor,
+                                    child: user?.photoUrl == null
+                                        ? Text(
+                                            (user?.username?[0] ?? 'U').toUpperCase(),
+                                            style: GoogleFonts.poppins(
+                                              color: Colors.white,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                                  loading: () => CircleAvatar(
+                                    backgroundColor: theme.primaryColor,
+                                    child: const CircularProgressIndicator(),
+                                  ),
+                                  error: (_, __) => CircleAvatar(
+                                    backgroundColor: theme.primaryColor,
+                                    child: const Icon(Icons.error),
+                                  ),
+                                );
+                              },
                             ),
-                            title: Text(
-                              post.username,
-                              style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.bold,
-                                color: theme.textTheme.bodyLarge?.color,
-                              ),
+                            title: Consumer(
+                              builder: (context, ref, child) {
+                                final userAsync = ref.watch(userProvider(post.userId));
+                                return userAsync.when(
+                                  data: (user) => Text(
+                                    user?.name?.isNotEmpty == true 
+                                        ? user!.name! 
+                                        : user?.username ?? 'Unknown User',
+                                    style: GoogleFonts.poppins(
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.textTheme.bodyLarge?.color,
+                                    ),
+                                  ),
+                                  loading: () => Text(
+                                    'Loading...',
+                                    style: GoogleFonts.poppins(
+                                      color: theme.textTheme.bodyMedium?.color,
+                                    ),
+                                  ),
+                                  error: (_, __) => Text(
+                                    'Unknown User',
+                                    style: GoogleFonts.poppins(
+                                      color: theme.textTheme.bodyMedium?.color,
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                             subtitle: Text(
                               DateTime.fromMillisecondsSinceEpoch(post.timestamp).toString(),
@@ -213,6 +251,14 @@ class MainScreen extends ConsumerWidget {
                               ),
                               onPressed: () {},
                             ),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => UserProfileScreen(userId: post.userId),
+                                ),
+                              );
+                            },
                           ),
                           if (post.imageUrl != null)
                             ClipRRect(

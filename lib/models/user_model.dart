@@ -1,43 +1,49 @@
 class UserModel {
   final String id;
   final String email;
-  final String username;
+  final String? username;
   final String? name;
   final String? photoUrl;
-  final int createdAt;
+  final String? about;
   final int? dob;
+  final int createdAt;
   final int followersCount;
   final int followingCount;
   final int postsCount;
-  final String? about;
+  final double rating;
+  final int ratingCount;
 
   UserModel({
     required this.id,
     required this.email,
-    required this.username,
+    this.username,
     this.name,
     this.photoUrl,
-    required this.createdAt,
-    this.dob,
-    required this.followersCount,
-    required this.followingCount,
-    required this.postsCount,
     this.about,
+    this.dob,
+    required this.createdAt,
+    this.followersCount = 0,
+    this.followingCount = 0,
+    this.postsCount = 0,
+    this.rating = 0.0,
+    this.ratingCount = 0,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     return UserModel(
       id: json['id'] as String,
       email: json['email'] as String,
-      username: json['username'] as String,
+      username: json['username'] as String?,
       name: json['name'] as String?,
       photoUrl: json['photoUrl'] as String?,
-      createdAt: json['createdAt'] as int,
+      about: json['about'] as String?,
       dob: json['dob'] as int?,
+      createdAt: json['createdAt'] as int,
       followersCount: json['followersCount'] as int? ?? 0,
       followingCount: json['followingCount'] as int? ?? 0,
       postsCount: json['postsCount'] as int? ?? 0,
-      about: json['about'] as String?,
+      rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
+      ratingCount: json['ratingCount'] as int? ?? 0,
     );
   }
 
@@ -45,15 +51,17 @@ class UserModel {
     return {
       'id': id,
       'email': email,
-      'username': username,
-      'name': name,
-      'photoUrl': photoUrl,
+      if (username != null) 'username': username,
+      if (name != null) 'name': name,
+      if (photoUrl != null) 'photoUrl': photoUrl,
+      if (about != null) 'about': about,
+      if (dob != null) 'dob': dob,
       'createdAt': createdAt,
-      'dob': dob,
       'followersCount': followersCount,
       'followingCount': followingCount,
       'postsCount': postsCount,
-      'about': about,
+      'rating': rating,
+      'ratingCount': ratingCount,
     };
   }
 
@@ -63,12 +71,14 @@ class UserModel {
     String? username,
     String? name,
     String? photoUrl,
-    int? createdAt,
+    String? about,
     int? dob,
+    int? createdAt,
     int? followersCount,
     int? followingCount,
     int? postsCount,
-    String? about,
+    double? rating,
+    int? ratingCount,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -76,12 +86,14 @@ class UserModel {
       username: username ?? this.username,
       name: name ?? this.name,
       photoUrl: photoUrl ?? this.photoUrl,
-      createdAt: createdAt ?? this.createdAt,
+      about: about ?? this.about,
       dob: dob ?? this.dob,
+      createdAt: createdAt ?? this.createdAt,
       followersCount: followersCount ?? this.followersCount,
       followingCount: followingCount ?? this.followingCount,
       postsCount: postsCount ?? this.postsCount,
-      about: about ?? this.about,
+      rating: rating ?? this.rating,
+      ratingCount: ratingCount ?? this.ratingCount,
     );
   }
 }

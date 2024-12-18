@@ -27,7 +27,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   final _nameController = TextEditingController();
   bool _isEditing = false;
   bool _isLoading = false;
-  bool _showPosts = false;
+  bool _showPosts = true;
   late TextEditingController _aboutController;
 
   @override
@@ -52,7 +52,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   void _startEditing(user) {
     setState(() {
       _isEditing = true;
-      _nameController.text = user.username;
+      _nameController.text = user.username ?? '';
       _aboutController.text = user.about ?? '';
     });
   }
@@ -93,34 +93,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
-  Future<void> _selectDate(BuildContext context, DateTime? currentDate) async {
+  Future<void> _pickDate(BuildContext context) async {
+    final initialDate = DateTime.now().subtract(const Duration(days: 365 * 18)); // 18 years ago
+    final firstDate = DateTime(1900);
+    final lastDate = DateTime.now().subtract(const Duration(days: 365 * 13)); // Must be at least 13
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: currentDate ?? DateTime.now(),
-      firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
+      helpText: 'Select your date of birth',
+      confirmText: 'Set Date',
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.dark(
-              primary: Colors.blue.shade400,
-              onPrimary: Colors.white,
-              surface: Colors.grey[900]!,
-              onSurface: Colors.white,
+            dialogTheme: DialogTheme(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
             ),
           ),
           child: child!,
         );
       },
     );
+    
     if (picked != null) {
-      // TODO: Update user dateOfBirth
+      await _updateField('dob', picked.millisecondsSinceEpoch.toString());
     }
   }
 
   String _formatDate(int timestamp) {
     final date = DateTime.fromMillisecondsSinceEpoch(timestamp);
-    return DateFormat.yMMMd().format(date);
+    return DateFormat('MMMM d, y').format(date); // Example: December 18, 2024
   }
 
   @override
@@ -279,9 +285,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                                   : null,
                               child: user.photoUrl == null
                                   ? Text(
-                                      user.username.isNotEmpty
-                                          ? user.username[0].toUpperCase()
-                                          : user.username[0].toUpperCase(),
+                                      user.username?.isNotEmpty == true
+                                          ? user.username![0].toUpperCase()
+                                          : user.username?[0].toUpperCase() ?? 'U',
                                       style: GoogleFonts.poppins(
                                         fontSize: 40,
                                         fontWeight: FontWeight.bold,
@@ -308,7 +314,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ),
                             ),
                             Text(
-                              user.name ?? user.username,
+                              user.name ?? user.username ?? 'User',
                               style: GoogleFonts.poppins(
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
@@ -345,6 +351,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   if (!_isEditing) ...[
                     _buildStats(user, theme),
                     const SizedBox(height: 30),
+                    _buildRatingSection(user, theme),
+                    const SizedBox(height: 30),
                     _buildAboutSection(user, theme),
                     const SizedBox(height: 30),
                     _buildDetailsSection(user, theme),
@@ -377,43 +385,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     if (_showPosts)
                       Consumer(
                         builder: (context, ref, child) {
-                          final userPosts = ref.watch(userPostsProvider(widget.userId));
+                          final userPosts = ref.watch(postsProvider).when(
+                            data: (posts) => posts.where((post) => post.userId == user.id).toList()
+                              ..sort((a, b) => b.timestamp.compareTo(a.timestamp)),
+                            loading: () => [],
+                            error: (_, __) => [],
+                          );
                           
-                          return userPosts.when(
-                            data: (posts) {
-                              if (posts.isEmpty) {
-                                return Center(
-                                  child: Text(
-                                    'No posts yet',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 16,
-                                      color: Colors.grey,
-                                    ),
-                                  ),
-                                );
-                              }
-                              
-                              return ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: posts.length,
-                                itemBuilder: (context, index) {
-                                  final post = posts[index];
-                                  return _buildPostCard(post, theme);
-                                },
-                              );
-                            },
-                            loading: () => const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                            error: (error, stack) => Center(
+                          if (userPosts.isEmpty) {
+                            return Center(
                               child: Text(
-                                'Error loading posts: $error',
+                                'No posts yet',
                                 style: GoogleFonts.poppins(
-                                  color: Colors.red,
+                                  fontSize: 16,
+                                  color: Colors.grey,
                                 ),
                               ),
-                            ),
+                            );
+                          }
+                          
+                          return ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: userPosts.length,
+                            itemBuilder: (context, index) {
+                              final post = userPosts[index];
+                              return _buildPostCard(post, theme);
+                            },
                           );
                         },
                       ),
@@ -553,6 +551,117 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Widget _buildRatingSection(UserModel user, ThemeData theme) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.dividerColor),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Profile Rating',
+            style: GoogleFonts.poppins(
+              color: theme.textTheme.bodyLarge?.color,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        user.rating.toStringAsFixed(1),
+                        style: GoogleFonts.poppins(
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                          color: _getRatingColor(user.rating),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'out of 5',
+                        style: GoogleFonts.poppins(
+                          color: theme.textTheme.bodyMedium?.color,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    '${user.ratingCount} ${user.ratingCount == 1 ? 'rating' : 'ratings'}',
+                    style: GoogleFonts.poppins(
+                      color: theme.textTheme.bodyMedium?.color,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: theme.dividerColor,
+                    width: 4,
+                  ),
+                ),
+                child: Center(
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      SizedBox(
+                        width: 72,
+                        height: 72,
+                        child: CircularProgressIndicator(
+                          value: user.rating / 5,
+                          backgroundColor: theme.dividerColor.withOpacity(0.2),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _getRatingColor(user.rating),
+                          ),
+                          strokeWidth: 8,
+                        ),
+                      ),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.star,
+                            color: _getRatingColor(user.rating),
+                            size: 24,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getRatingColor(double rating) {
+    if (rating >= 4.5) return Colors.green.shade400;
+    if (rating >= 4.0) return Colors.lightGreen.shade400;
+    if (rating >= 3.0) return Colors.orange.shade400;
+    if (rating >= 2.0) return Colors.deepOrange.shade400;
+    return Colors.red.shade400;
+  }
+
   Widget _buildAboutSection(user, ThemeData theme) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -612,6 +721,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             theme,
           ),
           _buildDetailRow(
+            Icons.cake,
+            'Date of Birth',
+            user.dob != null ? _formatDate(user.dob!) : 'Not set yet',
+            theme,
+          ),
+          _buildDetailRow(
             Icons.calendar_today,
             'Joined',
             _formatDate(user.createdAt),
@@ -654,60 +769,54 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _buildPostCard(PostModel post, ThemeData theme) {
-    return Card(
-      margin: const EdgeInsets.symmetric(
-        horizontal: 16.0,
-        vertical: 8.0,
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: theme.dividerColor),
       ),
-      color: theme.cardColor,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (post.imageUrl != null)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8.0),
-                child: Image.network(
-                  post.imageUrl!,
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                ),
-              ),
-            const SizedBox(height: 8.0),
             Text(
               post.content,
               style: GoogleFonts.poppins(
+                fontSize: 16,
                 color: theme.textTheme.bodyLarge?.color,
               ),
             ),
-            const SizedBox(height: 8.0),
+            const SizedBox(height: 12),
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(
-                  Icons.favorite,
-                  color: theme.primaryColor,
-                  size: 16,
-                ),
-                const SizedBox(width: 4.0),
                 Text(
-                  '${post.likes}',
+                  DateFormat('MMM d, y').format(
+                    DateTime.fromMillisecondsSinceEpoch(post.timestamp),
+                  ),
                   style: GoogleFonts.poppins(
+                    fontSize: 14,
                     color: theme.textTheme.bodyMedium?.color,
                   ),
                 ),
-                const SizedBox(width: 16.0),
-                Icon(
-                  Icons.comment,
-                  color: theme.primaryColor,
-                  size: 16,
-                ),
-                const SizedBox(width: 4.0),
-                Text(
-                  '${post.comments}',
-                  style: GoogleFonts.poppins(
-                    color: theme.textTheme.bodyMedium?.color,
-                  ),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.comment_outlined,
+                      size: 16,
+                      color: theme.textTheme.bodyMedium?.color,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${post.comments}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 14,
+                        color: theme.textTheme.bodyMedium?.color,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -738,15 +847,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   void _showEditDialog(String field) {
     final theme = Theme.of(context);
-    final user = ref.read(authProvider).value;
+    final user = ref.read(authProvider);
     
     final controller = TextEditingController(
       text: field == 'username' 
-          ? user?.username
+          ? user.when(
+              data: (user) => user?.username,
+              loading: () => null,
+              error: (_, __) => null,
+            )
           : field == 'name'
-              ? user?.name
+              ? user.when(
+                  data: (user) => user?.name,
+                  loading: () => null,
+                  error: (_, __) => null,
+                )
               : field == 'about'
-                  ? user?.about ?? ''
+                  ? user.when(
+                      data: (user) => user?.about ?? '',
+                      loading: () => null,
+                      error: (_, __) => null,
+                    )
                   : '',
     );
 
@@ -800,9 +921,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   Navigator.pop(context);
                 },
                 child: Text(
-                  user?.dob != null 
-                      ? 'Current: ${_formatDate(user!.dob!)}\nTap to change'
-                      : 'Select Date',
+                  user.when(
+                    data: (user) => user?.dob != null 
+                        ? 'Current: ${_formatDate(user?.dob ?? 0)}\nTap to change'
+                        : 'Select Date',
+                    loading: () => 'Select Date',
+                    error: (_, __) => 'Select Date',
+                  ),
                   textAlign: TextAlign.center,
                   style: GoogleFonts.poppins(
                     fontSize: 16,
@@ -882,20 +1007,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _pickDate(BuildContext context) async {
-    final initialDate = DateTime.now();
-    final newDate = await showDatePicker(
-      context: context,
-      initialDate: initialDate.subtract(const Duration(days: 365 * 18)), // 18 years ago
-      firstDate: DateTime(1900),
-      lastDate: initialDate.subtract(const Duration(days: 365 * 13)), // 13 years ago
-    );
-    
-    if (newDate != null) {
-      await _updateField('dob', newDate.millisecondsSinceEpoch.toString());
-    }
   }
 
   Future<void> _uploadImage(String imagePath) async {
