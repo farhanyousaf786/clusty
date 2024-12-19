@@ -15,6 +15,7 @@ import '../../utils/logger.dart';
 import '../../utils/time_ago_utils.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../widgets/post_card.dart';
 import 'edit_profile_screen.dart';
 
@@ -109,12 +110,67 @@ class _MainProfileState extends ConsumerState<MainProfile> with SingleTickerProv
     }
   }
 
-  Future<void> _pickImage() async {
-    final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      // TODO: Upload image to Firebase Storage and update user photoUrl
-      Logger.i('Image picked: ${image.path}');
+  Future<void> _pickAndUpdateImage(ImageSource source) async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(source: source);
+      
+      if (image != null) {
+        setState(() => _isLoading = true);
+        
+        // Get current user ID from Firebase Auth
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser == null) {
+          throw Exception('User not authenticated');
+        }
+        
+        // Upload image to Firebase Storage
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child('profile_pictures')
+            .child(currentUser.uid)
+            .child('profile.jpg');
+
+        // Upload file with metadata
+        final metadata = SettableMetadata(
+          contentType: 'image/jpeg',
+          customMetadata: {'uploadedAt': DateTime.now().toIso8601String()},
+        );
+        
+        await storageRef.putFile(File(image.path), metadata);
+        final photoUrl = await storageRef.getDownloadURL();
+
+        // Update user profile in database
+        await FirebaseDatabase.instance
+            .ref()
+            .child('users')
+            .child(currentUser.uid)
+            .update({
+              'photoUrl': photoUrl,
+              'updatedAt': ServerValue.timestamp,
+            });
+
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Profile picture updated successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      Logger.e('Error updating profile picture', e);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update profile picture: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -160,6 +216,83 @@ class _MainProfileState extends ConsumerState<MainProfile> with SingleTickerProv
     if (rating >= 3.5) return Colors.yellow;
     if (rating >= 3.0) return Colors.orange;
     return Colors.red;
+  }
+
+  void _showImagePickerOptions(BuildContext context, ThemeData theme) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: Colors.grey[600],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.primaryColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.camera_alt,
+                  color: theme.primaryColor,
+                ),
+              ),
+              title: Text(
+                'Take Photo',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _pickAndUpdateImage(ImageSource.camera);
+              },
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.primaryColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.photo_library,
+                  color: theme.primaryColor,
+                ),
+              ),
+              title: Text(
+                'Choose from Gallery',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                ),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _pickAndUpdateImage(ImageSource.gallery);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -281,42 +414,77 @@ class _MainProfileState extends ConsumerState<MainProfile> with SingleTickerProv
                             right: 0,
                             child: Column(
                               children: [
-                                // Profile Picture
-                                Container(
-                                  width: 120,
-                                  height: 120,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(
-                                      color: Colors.white,
-                                      width: 4,
-                                    ),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withOpacity(0.3),
-                                        blurRadius: 10,
-                                        spreadRadius: 5,
+                                // Profile Picture with Edit Button
+                                Stack(
+                                  children: [
+                                    Container(
+                                      width: 120,
+                                      height: 120,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 4,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withOpacity(0.3),
+                                            blurRadius: 10,
+                                            spreadRadius: 5,
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                                  child: CircleAvatar(
-                                    backgroundColor: theme.primaryColor,
-                                    backgroundImage: user.photoUrl != null
-                                        ? NetworkImage(user.photoUrl!)
-                                        : null,
-                                    child: user.photoUrl == null
-                                        ? Text(
-                                            user.username?.isNotEmpty == true
-                                                ? user.username![0].toUpperCase()
-                                                : 'U',
-                                            style: GoogleFonts.poppins(
-                                              fontSize: 48,
-                                              fontWeight: FontWeight.bold,
-                                              color: Colors.white,
+                                      child: CircleAvatar(
+                                        backgroundColor: theme.primaryColor,
+                                        backgroundImage: user.photoUrl != null
+                                            ? NetworkImage(user.photoUrl!)
+                                            : null,
+                                        child: user.photoUrl == null
+                                            ? Text(
+                                                user.username?.isNotEmpty == true
+                                                    ? user.username![0].toUpperCase()
+                                                    : 'U',
+                                                style: GoogleFonts.poppins(
+                                                  fontSize: 48,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              )
+                                            : null,
+                                      ),
+                                    ),
+                                    if (widget.userId == null || widget.userId == ref.read(authProvider).value?.id)
+                                      Positioned(
+                                        right: 0,
+                                        bottom: 0,
+                                        child: GestureDetector(
+                                          onTap: () => _showImagePickerOptions(context, theme),
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: theme.primaryColor,
+                                              shape: BoxShape.circle,
+                                              border: Border.all(
+                                                color: Colors.white,
+                                                width: 2,
+                                              ),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withOpacity(0.2),
+                                                  blurRadius: 8,
+                                                  spreadRadius: 2,
+                                                ),
+                                              ],
                                             ),
-                                          )
-                                        : null,
-                                  ),
+                                            child: const Icon(
+                                              Icons.camera,
+                                              color: Colors.white,
+                                              size: 15,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
                                 ),
                                 const SizedBox(height: 16),
                                 // Name and Username
