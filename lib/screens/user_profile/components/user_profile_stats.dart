@@ -99,98 +99,22 @@ class UserProfileStats extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Rating',
+                    style: GoogleFonts.poppins(
+                      fontSize: 14,
+                      color: theme.textTheme.bodyLarge?.color?.withOpacity(0.7),
+                    ),
+                  ),
                 ],
               ),
               _buildStatsItem('Following', '${user.followingCount ?? 0}'),
               _buildStatsItem('Followers', '${user.followersCount ?? 0}'),
+              _buildStatsItem('Posts', '${user.postsCount ?? 0}'),
             ],
           ),
         ),
-        const SizedBox(height: 20),
-        // About Section
-        if (user.about?.isNotEmpty == true || user.dob != null)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: theme.cardColor,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: theme.primaryColor.withOpacity(0.1),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: theme.primaryColor.withOpacity(0.1),
-                  blurRadius: 20,
-                  spreadRadius: -5,
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (user.about?.isNotEmpty == true) ...[
-                  Text(
-                    'About',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: theme.textTheme.titleLarge?.color,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    user.about!,
-                    style: GoogleFonts.poppins(
-                      color: theme.textTheme.bodyMedium?.color,
-                      height: 1.5,
-                    ),
-                  ),
-                  if (user.dob != null) const SizedBox(height: 16),
-                ],
-                if (user.dob != null) ...[
-                  Row(
-                    children: [
-                      Icon(Icons.cake, color: theme.primaryColor),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Born ${DateFormat.yMMMMd().format(DateTime.fromMillisecondsSinceEpoch(user.dob!))}',
-                        style: GoogleFonts.poppins(
-                          color: theme.textTheme.bodyMedium?.color,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Icon(Icons.calendar_today, color: theme.primaryColor),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Joined ${TimeAgoUtils.getTimeAgo(user.createdAt ?? 0)}',
-                      style: GoogleFonts.poppins(
-                        color: theme.textTheme.bodyMedium?.color,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Icon(Icons.photo_library, color: theme.primaryColor),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${user.postsCount ?? 0} posts',
-                      style: GoogleFonts.poppins(
-                        color: theme.textTheme.bodyMedium?.color,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
       ],
     );
   }
