@@ -228,11 +228,16 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
               ),
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Expanded(
                   child: TextField(
                     controller: _commentController,
                     focusNode: _focusNode,
+                    maxLines: null,
+                    minLines: 1,
+                    textInputAction: TextInputAction.newline,
+                    keyboardType: TextInputType.multiline,
                     style: GoogleFonts.poppins(
                       color: theme.textTheme.bodyLarge?.color,
                       fontSize: 14,
@@ -242,11 +247,21 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
                       hintStyle: TextStyle(
                         color: theme.textTheme.bodyMedium?.color,
                       ),
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                      isDense: true,
                       border: InputBorder.none,
+                      constraints: const BoxConstraints(
+                        maxHeight: 100,
+                      ),
                     ),
                   ),
                 ),
                 IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
                   onPressed: () async {
                     final content = _commentController.text.trim();
                     if (content.isEmpty) return;
