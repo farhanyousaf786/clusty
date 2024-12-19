@@ -5,7 +5,7 @@ import 'dart:async';
 import '../providers/search_provider.dart';
 import '../providers/theme_provider.dart';
 import '../providers/auth_provider.dart';
-import 'user_profile_screen.dart';
+import 'user_profile/user_profile_screen.dart';
 import '../utils/logger.dart';
 
 class SearchScreen extends ConsumerStatefulWidget {

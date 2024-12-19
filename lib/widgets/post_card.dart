@@ -9,7 +9,7 @@ import '../providers/reactions_provider.dart';
 import '../providers/comments_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
-import '../screens/user_profile_screen.dart';
+import '../screens/user_profile/user_profile_screen.dart';
 import '../providers/theme_provider.dart';
 import '../utils/time_ago_utils.dart';
 import 'shimmer_widgets.dart';
