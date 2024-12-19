@@ -556,7 +556,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> with Sing
                             colors: [
                               Colors.black.withOpacity(0.7),
                               Colors.transparent,
+                              theme.scaffoldBackgroundColor.withOpacity(0.5),
                             ],
+                            stops: const [0.0, 0.3, 0.9],
                           ),
                         ),
                       ),
