@@ -5,11 +5,14 @@ import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
 import '../models/post_model.dart';
 import '../models/reaction_type.dart';
-import '../providers/user_provider.dart';
 import '../providers/reactions_provider.dart';
+import '../providers/comments_provider.dart';
+import '../providers/auth_provider.dart';
+import '../providers/user_provider.dart';
 import '../screens/user_profile_screen.dart';
 import '../providers/theme_provider.dart';
 import 'shimmer_widgets.dart';
+import 'comments_sheet.dart'; // Import the CommentsSheet widget
 
 class PostCard extends ConsumerWidget {
   final PostModel post;
@@ -339,23 +342,62 @@ class PostCard extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 16),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.chat_bubble_outline,
-                      size: 18,
-                      color: theme.textTheme.bodyMedium?.color,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      post.comments.toString(),
-                      style: TextStyle(
-                        color: theme.textTheme.bodyMedium?.color,
-                        fontSize: 13,
-                        letterSpacing: -0.3,
+                GestureDetector(
+                  onTap: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (context) => Padding(
+                        padding: EdgeInsets.only(
+                          bottom: MediaQuery.of(context).viewInsets.bottom,
+                        ),
+                        child: CommentsSheet(postId: post.id),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: theme.brightness == Brightness.dark
+                          ? const Color(0xFF2A2A2A)
+                          : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: theme.brightness == Brightness.dark
+                            ? const Color(0xFF3A3A3A)
+                            : Colors.grey[300]!,
                       ),
                     ),
-                  ],
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          size: 18,
+                          color: theme.textTheme.bodyMedium?.color,
+                        ),
+                        const SizedBox(width: 6),
+                        Consumer(
+                          builder: (context, ref, child) {
+                            final commentsAsync = ref.watch(postCommentsProvider(post.id));
+                            return Text(
+                              commentsAsync.when(
+                                data: (comments) => comments.length.toString(),
+                                loading: () => '...',
+                                error: (_, __) => '0',
+                              ),
+                              style: TextStyle(
+                                color: theme.textTheme.bodyMedium?.color,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                letterSpacing: -0.3,
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
