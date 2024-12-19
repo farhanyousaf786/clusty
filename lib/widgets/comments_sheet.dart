@@ -54,7 +54,7 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          Expanded(
+          Flexible(
             child: commentsAsync.when(
               data: (comments) => comments.isEmpty
                   ? Center(
@@ -214,12 +214,7 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
             ),
           ),
           Container(
-            padding: EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 8,
-              bottom: MediaQuery.of(context).viewInsets.bottom + 8,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
               color: theme.cardColor,
               border: Border(
