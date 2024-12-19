@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import 'main_profile/main_profile.dart';
 import 'main_screen.dart';
 import 'clusty_screen.dart';
 import 'chat_screen.dart';
-import 'profile_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -22,7 +22,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     MainScreen(),
     ChatScreen(),
     ClustyScreen(),
-    ProfileScreen(),
+    MainProfile(),
   ];
 
   final List<NavigationDestination> _destinations = const [
