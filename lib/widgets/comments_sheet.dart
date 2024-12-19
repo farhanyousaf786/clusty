@@ -7,6 +7,7 @@ import '../providers/comments_provider.dart';
 import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
 import '../providers/theme_provider.dart';
+import '../utils/time_ago_utils.dart';
 import 'shimmer_widgets.dart';
 
 class CommentsSheet extends ConsumerStatefulWidget {
@@ -161,39 +162,40 @@ class _CommentsSheetState extends ConsumerState<CommentsSheet> {
                                         letterSpacing: -0.3,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      DateFormat('MMM d, y h:mm a').format(
-                                        DateTime.fromMillisecondsSinceEpoch(
-                                          comment.timestamp,
-                                        ),
-                                      ),
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: theme.textTheme.bodyMedium?.color,
-                                        letterSpacing: -0.3,
+                                    Padding(
+                                      padding: const EdgeInsets.all(2.0),
+                                      child: Row(
+                                        
+                                        children: [
+                                          Text(
+                                            TimeAgoUtils.getTimeAgo(comment.timestamp),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: theme.textTheme.bodyMedium?.color,
+                                              letterSpacing: -0.3,
+                                            ),
+                                          ),
+                                          if (comment.userId == currentUser?.id) ...[
+                                            const SizedBox(width: 4),
+                                            GestureDetector(
+                                              onTap: () {
+                                                ref
+                                                    .read(commentsProvider.notifier)
+                                                    .deleteComment(
+                                                      widget.postId,
+                                                      comment.id,
+                                                    );
+                                              },
+                                              child: Icon(
+                                                Icons.delete_outline,
+                                                size: 14,
+                                                color: theme.textTheme.bodyMedium?.color,
+                                              ),
+                                            ),
+                                          ],
+                                        ],
                                       ),
                                     ),
-                                    if (comment.userId == currentUser?.id)
-                                      Align(
-                                        alignment: Alignment.centerRight,
-                                        child: IconButton(
-                                          onPressed: () {
-                                            ref
-                                                .read(commentsProvider.notifier)
-                                                .deleteComment(
-                                                  widget.postId,
-                                                  comment.id,
-                                                );
-                                          },
-                                          icon: Icon(
-                                            Icons.delete_outline,
-                                            size: 18,
-                                            color:
-                                                theme.textTheme.bodyMedium?.color,
-                                          ),
-                                        ),
-                                      ),
                                   ],
                                 ),
                               ),

@@ -11,6 +11,7 @@ import '../providers/auth_provider.dart';
 import '../providers/user_provider.dart';
 import '../screens/user_profile_screen.dart';
 import '../providers/theme_provider.dart';
+import '../utils/time_ago_utils.dart';
 import 'shimmer_widgets.dart';
 import 'comments_sheet.dart'; // Import the CommentsSheet widget
 
@@ -151,13 +152,9 @@ class PostCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        DateFormat('MMM d, y h:mm a').format(
-                          DateTime.fromMillisecondsSinceEpoch(
-                            post.timestamp * 1000,
-                          ),
-                        ),
+                        TimeAgoUtils.getTimeAgo(post.timestamp),
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12,
                           color: theme.textTheme.bodyMedium?.color,
                           letterSpacing: -0.3,
                         ),
