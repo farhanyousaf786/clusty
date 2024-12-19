@@ -517,151 +517,142 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> with Sing
 
         return Scaffold(
           backgroundColor: theme.scaffoldBackgroundColor,
-          body: AnimatedBackground(
-            color: theme.primaryColor,
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(),
-              slivers: [
-                // App Bar with Profile Header
-                SliverAppBar(
-                  expandedHeight: 300,
-                  floating: false,
-                  pinned: true,
-                  stretch: true,
-                  backgroundColor: Colors.transparent,
-                  flexibleSpace: FlexibleSpaceBar(
-                    background: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // Profile Image Background
-                        if (user.photoUrl != null)
-                          ShaderMask(
-                            shaderCallback: (rect) {
-                              return LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  Colors.transparent,
-                                  theme.scaffoldBackgroundColor,
-                                ],
-                              ).createShader(rect);
-                            },
-                            blendMode: BlendMode.dstOut,
-                            child: Image.network(
-                              user.photoUrl!,
-                              fit: BoxFit.cover,
-                            ),
-                          ),
-                        // Gradient Overlay
-                        Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
+          body: CustomScrollView(
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 300,
+                floating: false,
+                pinned: true,
+                stretch: true,
+                backgroundColor: Colors.transparent,
+                flexibleSpace: FlexibleSpaceBar(
+                  background: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (user.photoUrl != null)
+                        ShaderMask(
+                          shaderCallback: (rect) {
+                            return LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
-                                Colors.black.withOpacity(0.7),
                                 Colors.transparent,
+                                theme.scaffoldBackgroundColor,
                               ],
-                            ),
+                            ).createShader(rect);
+                          },
+                          blendMode: BlendMode.dstOut,
+                          child: Image.network(
+                            user.photoUrl!,
+                            fit: BoxFit.cover,
                           ),
                         ),
-                        UserProfileHeader(
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.black.withOpacity(0.7),
+                              Colors.transparent,
+                            ],
+                          ),
+                        ),
+                      ),
+                      UserProfileHeader(
+                        user: user,
+                        theme: theme,
+                        width: size.width,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              SliverToBoxAdapter(
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: UserProfileStats(
                           user: user,
                           theme: theme,
-                          width: size.width,
+                          onRatingTap: () => _showRatingDetailsDialog(user),
                         ),
-                      ],
-                    ),
+                      ),
+                      UserProfileActions(userId: widget.userId, theme: theme),
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: UserProfileRating(
+                          user: user,
+                          theme: theme,
+                          onRatePressed: () => _showRatingDialog(user),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+              ),
 
-                // Stats and Actions Section
-                SliverToBoxAdapter(
-                  child: SlideTransition(
-                    position: _slideAnimation,
-                    child: Column(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: UserProfileStats(
-                            user: user,
-                            theme: theme,
-                            onRatingTap: () => _showRatingDetailsDialog(user),
-                          ),
-                        ),
-                        UserProfileActions(userId: widget.userId, theme: theme),
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: UserProfileRating(
-                            user: user,
-                            theme: theme,
-                            onRatePressed: () => _showRatingDialog(user),
-                          ),
-                        ),
-                      ],
-                    ),
+              SliverToBoxAdapter(
+                child: Container(
+                  margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.cardColor,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                ),
-
-                // About Section
-                SliverToBoxAdapter(
-                  child: Container(
-                    margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: theme.cardColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildInfoRow(
+                        Icons.description_outlined,
+                        'About',
+                        user.about ?? 'No description added yet.',
+                        theme,
+                      ),
+                      const SizedBox(height: 12),
+                      if (user.dob != null) ...[
                         _buildInfoRow(
-                          Icons.description_outlined,
-                          'About',
-                          user.about ?? 'No description added yet.',
+                          Icons.cake_outlined,
+                          'Birthday',
+                          DateFormat('MMMM d, y').format(
+                            DateTime.fromMillisecondsSinceEpoch(user.dob!),
+                          ),
                           theme,
                         ),
                         const SizedBox(height: 12),
-                        if (user.dob != null) ...[
-                          _buildInfoRow(
-                            Icons.cake_outlined,
-                            'Birthday',
-                            DateFormat('MMMM d, y').format(
-                              DateTime.fromMillisecondsSinceEpoch(user.dob!),
-                            ),
-                            theme,
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        _buildInfoRow(
-                          Icons.post_add_outlined,
-                          'Total Posts',
-                          '${user.postsCount} posts',
-                          theme,
-                        ),
-                        const SizedBox(height: 12),
-                        _buildInfoRow(
-                          Icons.calendar_today_outlined,
-                          'Joined',
-                          TimeAgoUtils.getTimeAgo(user.createdAt),
-                          theme,
-                        ),
                       ],
-                    ),
+                      _buildInfoRow(
+                        Icons.post_add_outlined,
+                        'Total Posts',
+                        '${user.postsCount} posts',
+                        theme,
+                      ),
+                      const SizedBox(height: 12),
+                      _buildInfoRow(
+                        Icons.calendar_today_outlined,
+                        'Joined',
+                        TimeAgoUtils.getTimeAgo(user.createdAt),
+                        theme,
+                      ),
+                    ],
                   ),
                 ),
+              ),
 
-                // Posts Section
-                SliverToBoxAdapter(
-                  child: UserProfilePosts(
-                    userId: widget.userId,
-                    theme: theme,
-                    showPosts: _showPosts,
-                    onTogglePosts: _togglePosts,
-                  ),
+              SliverToBoxAdapter(
+                child: UserProfilePosts(
+                  userId: widget.userId,
+                  theme: theme,
+                  showPosts: _showPosts,
+                  onTogglePosts: _togglePosts,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         );
       },
