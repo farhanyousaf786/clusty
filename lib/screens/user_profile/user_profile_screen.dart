@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:intl/intl.dart';
 import '../../models/user_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
@@ -377,7 +378,6 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> with Sing
               final timestampInt = rating['timestamp'] as int;
               final ratingValue = (rating['rating'] as num).toDouble();
               final username = rating['raterUsername'] as String?;
-              
               return ListTile(
                 leading: CircleAvatar(
                   backgroundImage: rating['raterPhotoUrl'] != null
@@ -442,6 +442,58 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> with Sing
     );
   }
 
+  Widget _buildInfoRow(IconData icon, String label, String value, ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    final iconColor = isDark ? theme.primaryColor : theme.primaryColor.withOpacity(0.7);
+    final labelColor = isDark ? Colors.white70 : Colors.black87;
+    final valueColor = isDark ? Colors.white : Colors.black;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: theme.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: iconColor,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: labelColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: valueColor,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = ref.watch(themeProvider);
@@ -472,16 +524,53 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> with Sing
               slivers: [
                 // App Bar with Profile Header
                 SliverAppBar(
-                  expandedHeight: 280,
+                  expandedHeight: 300,
                   floating: false,
                   pinned: true,
                   stretch: true,
                   backgroundColor: Colors.transparent,
                   flexibleSpace: FlexibleSpaceBar(
-                    background: UserProfileHeader(
-                      user: user,
-                      theme: theme,
-                      width: size.width,
+                    background: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Profile Image Background
+                        if (user.photoUrl != null)
+                          ShaderMask(
+                            shaderCallback: (rect) {
+                              return LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.transparent,
+                                  theme.scaffoldBackgroundColor,
+                                ],
+                              ).createShader(rect);
+                            },
+                            blendMode: BlendMode.dstOut,
+                            child: Image.network(
+                              user.photoUrl!,
+                              fit: BoxFit.cover,
+                            ),
+                          ),
+                        // Gradient Overlay
+                        Container(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [
+                                Colors.black.withOpacity(0.7),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                        ),
+                        UserProfileHeader(
+                          user: user,
+                          theme: theme,
+                          width: size.width,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -508,6 +597,54 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> with Sing
                             theme: theme,
                             onRatePressed: () => _showRatingDialog(user),
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // About Section
+                SliverToBoxAdapter(
+                  child: Container(
+                    margin: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: theme.cardColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildInfoRow(
+                          Icons.description_outlined,
+                          'About',
+                          user.about ?? 'No description added yet.',
+                          theme,
+                        ),
+                        const SizedBox(height: 12),
+                        if (user.dob != null) ...[
+                          _buildInfoRow(
+                            Icons.cake_outlined,
+                            'Birthday',
+                            DateFormat('MMMM d, y').format(
+                              DateTime.fromMillisecondsSinceEpoch(user.dob!),
+                            ),
+                            theme,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        _buildInfoRow(
+                          Icons.post_add_outlined,
+                          'Total Posts',
+                          '${user.postsCount} posts',
+                          theme,
+                        ),
+                        const SizedBox(height: 12),
+                        _buildInfoRow(
+                          Icons.calendar_today_outlined,
+                          'Joined',
+                          TimeAgoUtils.getTimeAgo(user.createdAt),
+                          theme,
                         ),
                       ],
                     ),

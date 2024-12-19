@@ -219,13 +219,18 @@ class _MainProfileState extends ConsumerState<MainProfile> with SingleTickerProv
   }
 
   void _showImagePickerOptions(BuildContext context, ThemeData theme) {
+    final isDark = theme.brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black;
+    final backgroundColor = isDark ? theme.scaffoldBackgroundColor : Colors.white;
+    final dividerColor = isDark ? Colors.white12 : Colors.black12;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
+          color: backgroundColor,
           borderRadius: const BorderRadius.vertical(
             top: Radius.circular(20),
           ),
@@ -238,7 +243,7 @@ class _MainProfileState extends ConsumerState<MainProfile> with SingleTickerProv
               height: 4,
               margin: const EdgeInsets.only(bottom: 20),
               decoration: BoxDecoration(
-                color: Colors.grey[600],
+                color: dividerColor,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -257,7 +262,7 @@ class _MainProfileState extends ConsumerState<MainProfile> with SingleTickerProv
               title: Text(
                 'Take Photo',
                 style: GoogleFonts.poppins(
-                  color: Colors.white,
+                  color: textColor,
                 ),
               ),
               onTap: () {
@@ -281,7 +286,7 @@ class _MainProfileState extends ConsumerState<MainProfile> with SingleTickerProv
               title: Text(
                 'Choose from Gallery',
                 style: GoogleFonts.poppins(
-                  color: Colors.white,
+                  color: textColor,
                 ),
               ),
               onTap: () {
@@ -896,37 +901,54 @@ class _MainProfileState extends ConsumerState<MainProfile> with SingleTickerProv
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value, ThemeData theme) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(
-          icon,
-          size: 18,
-          color: theme.primaryColor,
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  color: Colors.white70,
-                ),
-              ),
-              Text(
-                value,
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Colors.white,
-                ),
-              ),
-            ],
+    final isDark = theme.brightness == Brightness.dark;
+    final iconColor = isDark ? theme.primaryColor : theme.primaryColor.withOpacity(0.7);
+    final labelColor = isDark ? Colors.white70 : Colors.black87;
+    final valueColor = isDark ? Colors.white : Colors.black;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: theme.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: iconColor,
+              size: 20,
+            ),
           ),
-        ),
-      ],
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.poppins(
+                    fontSize: 12,
+                    color: labelColor,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: GoogleFonts.poppins(
+                    fontSize: 14,
+                    color: valueColor,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 

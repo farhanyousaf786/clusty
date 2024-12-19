@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../models/user_model.dart';
 import '../../../utils/time_ago_utils.dart';
+import 'user_profile_stats.dart';
 
 class UserProfileHeader extends StatelessWidget {
   final UserModel user;
@@ -17,78 +18,83 @@ class UserProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Profile Picture with Glow
-        Positioned(
-          bottom: 60,
-          left: width * 0.5 - 60,
-          child: Container(
+    return Positioned(
+      bottom: 20,
+      left: 0,
+      right: 0,
+      child: Column(
+        children: [
+          // Profile Picture
+          Container(
+            width: 120,
+            height: 120,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white,
+                width: 4,
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: theme.primaryColor.withOpacity(0.3),
-                  blurRadius: 20,
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 10,
                   spreadRadius: 5,
                 ),
               ],
             ),
             child: CircleAvatar(
-              radius: 60,
-              backgroundColor: theme.cardColor,
+              backgroundColor: theme.primaryColor,
               backgroundImage: user.photoUrl != null
                   ? NetworkImage(user.photoUrl!)
                   : null,
-              child: user.username?.isNotEmpty == true
+              child: user.photoUrl == null
                   ? Text(
-                      user.username![0].toUpperCase(),
+                      user.username?.isNotEmpty == true
+                          ? user.username![0].toUpperCase()
+                          : 'U',
                       style: GoogleFonts.poppins(
                         fontSize: 48,
                         fontWeight: FontWeight.bold,
-                        color: theme.primaryColor,
+                        color: Colors.white,
                       ),
                     )
                   : null,
             ),
           ),
-        ),
-        // Username with Glow
-        Positioned(
-          bottom: 20,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Column(
-              children: [
-                Text(
-                  user.username ?? 'Anonymous',
-                  style: GoogleFonts.poppins(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    shadows: [
-                      Shadow(
-                        color: theme.primaryColor.withOpacity(0.5),
-                        blurRadius: 10,
-                      ),
-                    ],
-                  ),
+          const SizedBox(height: 16),
+          // Name
+          Text(
+            user.name ?? 'Anonymous',
+            style: GoogleFonts.poppins(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              shadows: [
+                Shadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 10,
                 ),
-                if (user.createdAt != null)
-                  Text(
-                    'Joined ${TimeAgoUtils.getTimeAgo(user.createdAt)}',
-                    style: GoogleFonts.poppins(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
               ],
             ),
           ),
-        ),
-      ],
+          const SizedBox(height: 4),
+          // Username
+          Text(
+            '@${user.username ?? 'anonymous'}',
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              color: Colors.white70,
+              shadows: [
+                Shadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 10,
+                ),
+              ],
+            ),
+          ),
+ 
+        ],
+      ),
     );
   }
 }
