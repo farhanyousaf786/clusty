@@ -1,28 +1,119 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_database/firebase_database.dart' as rtdb;
-import '../models/reaction_model.dart';
+import '../models/reaction_type.dart';
 import 'auth_provider.dart';
 
-class ReactionsNotifier extends StateNotifier<Map<String, bool>> {
+class Reaction {
+  final String id;
+  final String userId;
+  final String postId;
+  final ReactionType type;
+  final int timestamp;
+
+  Reaction({
+    required this.id,
+    required this.userId,
+    required this.postId,
+    required this.type,
+    required this.timestamp,
+  });
+
+  factory Reaction.fromMap(Map<String, dynamic> map, String id) {
+    return Reaction(
+      id: id,
+      userId: map['userId'],
+      postId: map['postId'],
+      type: ReactionType.values.firstWhere(
+        (e) => e.toString() == map['type'],
+        orElse: () => ReactionType.like,
+      ),
+      timestamp: map['timestamp'],
+    );
+  }
+}
+
+class ReactionsState {
+  final List<Reaction> reactions;
+  final Set<String> loadingPosts; // Track loading state per post
+  final String? error;
+
+  const ReactionsState({
+    required this.reactions,
+    this.loadingPosts = const {},
+    this.error,
+  });
+
+  bool isPostLoading(String postId) => loadingPosts.contains(postId);
+
+  ReactionsState copyWith({
+    List<Reaction>? reactions,
+    Set<String>? loadingPosts,
+    String? error,
+  }) {
+    return ReactionsState(
+      reactions: reactions ?? this.reactions,
+      loadingPosts: loadingPosts ?? this.loadingPosts,
+      error: error ?? this.error,
+    );
+  }
+
+  ReactionsState startLoading(String postId) {
+    return copyWith(loadingPosts: {...loadingPosts, postId});
+  }
+
+  ReactionsState stopLoading(String postId) {
+    return copyWith(loadingPosts: {...loadingPosts}..remove(postId));
+  }
+}
+
+class ReactionsNotifier extends StateNotifier<ReactionsState> {
   final Ref _ref;
   final _database = rtdb.FirebaseDatabase.instance;
+  late final rtdb.DatabaseReference _reactionsRef;
 
-  ReactionsNotifier(this._ref) : super({});
+  ReactionsNotifier(this._ref) : super(const ReactionsState(reactions: [])) {
+    _reactionsRef = _database.ref().child('reactions');
+    _initializeReactions();
+  }
 
-  Future<void> toggleReaction(String postId, String type) async {
-    try {
-      // Set loading state for this specific reaction
-      state = {...state, '$postId:$type': true};
-      
-      final currentUser = _ref.read(authProvider).value;
-      if (currentUser == null) {
-        state = {...state, '$postId:$type': false};
+  void _initializeReactions() {
+    _reactionsRef.onValue.listen((event) {
+      if (!event.snapshot.exists) {
+        state = state.copyWith(reactions: []);
         return;
       }
 
-      final reactionsRef = _database
-          .ref()
-          .child('reactions')
+      try {
+        final data = event.snapshot.value as Map;
+        final reactions = <Reaction>[];
+
+        data.forEach((postId, postReactions) {
+          if (postReactions is Map) {
+            postReactions.forEach((userId, reaction) {
+              if (reaction is Map) {
+                reactions.add(Reaction.fromMap(
+                  Map<String, dynamic>.from(reaction as Map),
+                  '$postId:$userId',
+                ));
+              }
+            });
+          }
+        });
+
+        state = state.copyWith(reactions: reactions);
+      } catch (e) {
+        state = state.copyWith(error: e.toString());
+      }
+    });
+  }
+
+  Future<void> addReaction(String postId, ReactionType type) async {
+    try {
+      state = state.startLoading(postId);
+      final currentUser = _ref.read(authProvider).value;
+      if (currentUser == null) return;
+
+      final reactionsRef = _reactionsRef
           .child(postId)
           .child(currentUser.id);
 
@@ -30,74 +121,74 @@ class ReactionsNotifier extends StateNotifier<Map<String, bool>> {
       
       if (snapshot.exists) {
         final existingType = (snapshot.value as Map)['type'];
-        if (existingType == type) {
-          // Remove reaction if clicking the same type
+        if (existingType == type.toString()) {
           await reactionsRef.remove();
-          state = {...state, '$postId:$type': false};
           return;
         }
       }
 
-      // Add or update reaction
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
       await reactionsRef.set({
         'userId': currentUser.id,
         'postId': postId,
-        'type': type,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'type': type.toString(),
+        'timestamp': timestamp,
       });
-
-      state = {...state, '$postId:$type': false};
     } catch (e) {
-      state = {...state, '$postId:$type': false};
+      state = state.copyWith(error: e.toString());
+    } finally {
+      state = state.stopLoading(postId);
     }
   }
 
-  bool isLoading(String postId, String type) {
-    return state['$postId:$type'] ?? false;
+  Future<void> removeReaction(String postId) async {
+    try {
+      state = state.startLoading(postId);
+      final currentUser = _ref.read(authProvider).value;
+      if (currentUser == null) return;
+
+      await _reactionsRef
+          .child(postId)
+          .child(currentUser.id)
+          .remove();
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    } finally {
+      state = state.stopLoading(postId);
+    }
   }
 }
 
-final reactionsProvider = StateNotifierProvider<ReactionsNotifier, Map<String, bool>>((ref) {
+final reactionsProvider = StateNotifierProvider<ReactionsNotifier, ReactionsState>((ref) {
   return ReactionsNotifier(ref);
 });
 
-final userReactionProvider = StreamProvider.family<ReactionModel?, String>((ref, postId) {
+final userReactionProvider = Provider.family<Reaction?, String>((ref, postId) {
+  final reactions = ref.watch(reactionsProvider).reactions;
   final currentUser = ref.watch(authProvider).value;
-  if (currentUser == null) return Stream.value(null);
+  if (currentUser == null) return null;
 
-  return rtdb.FirebaseDatabase.instance
-      .ref()
-      .child('reactions')
-      .child(postId)
-      .child(currentUser.id)
-      .onValue
-      .map((event) {
-        if (!event.snapshot.exists || event.snapshot.value == null) return null;
-        final data = Map<String, dynamic>.from(event.snapshot.value as Map);
-        data['id'] = event.snapshot.key;
-        return ReactionModel.fromJson(data);
-      });
+  try {
+    return reactions.firstWhere(
+      (reaction) => reaction.postId == postId && reaction.userId == currentUser.id,
+    );
+  } catch (_) {
+    return null;
+  }
 });
 
-final postReactionsProvider = StreamProvider.family<Map<String, int>, String>((ref, postId) {
-  return rtdb.FirebaseDatabase.instance
-      .ref()
-      .child('reactions')
-      .child(postId)
-      .onValue
-      .map((event) {
-        if (!event.snapshot.exists || event.snapshot.value == null) {
-          return {};
-        }
-
-        final reactions = Map<String, dynamic>.from(event.snapshot.value as Map);
-        final counts = <String, int>{};
-
-        reactions.values.forEach((reaction) {
-          final type = (reaction as Map)['type'] as String;
-          counts[type] = (counts[type] ?? 0) + 1;
-        });
-
-        return counts;
-      });
+final postReactionsProvider = Provider.family<AsyncValue<List<Reaction>>, String>((ref, postId) {
+  final reactionsState = ref.watch(reactionsProvider);
+  
+  if (reactionsState.isPostLoading(postId)) {
+    return const AsyncValue.loading();
+  }
+  
+  if (reactionsState.error != null) {
+    return AsyncValue.error(reactionsState.error!, StackTrace.current);
+  }
+  
+  return AsyncValue.data(
+    reactionsState.reactions.where((reaction) => reaction.postId == postId).toList()
+  );
 });

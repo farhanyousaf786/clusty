@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:shimmer/shimmer.dart';
 import '../models/post_model.dart';
+import '../models/reaction_type.dart';
 import '../providers/user_provider.dart';
 import '../providers/reactions_provider.dart';
 import '../screens/user_profile_screen.dart';
+import '../providers/theme_provider.dart';
+import 'shimmer_widgets.dart';
 
 class PostCard extends ConsumerWidget {
   final PostModel post;
@@ -20,49 +24,38 @@ class PostCard extends ConsumerWidget {
   });
 
   static const reactionEmojis = {
-    'like': '👍',
-    'love': '❤️',
-    'haha': '😂',
-    'wow': '😮',
-    'sad': '😢',
-    'angry': '😠',
+    'like': '',
+    'love': '',
+    'haha': '',
+    'wow': '',
+    'sad': '',
+    'angry': '',
   };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
+    final theme = ref.watch(themeProvider);
     final userReactionAsync = ref.watch(userReactionProvider(post.id));
     final reactionsAsync = ref.watch(postReactionsProvider(post.id));
     final reactions = ref.watch(reactionsProvider);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: theme.brightness == Brightness.dark
-            ? Colors.grey[850]
-            : theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: theme.brightness == Brightness.dark
-              ? Colors.grey[800]!
-              : theme.colorScheme.outline.withOpacity(0.1),
+              ? const Color(0xFF2A2A2A)
+              : Colors.grey[200]!,
           width: 1,
         ),
-        boxShadow: [
-          if (theme.brightness == Brightness.dark)
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // User Info Row
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             child: Row(
               children: [
                 Consumer(
@@ -78,36 +71,46 @@ class PostCard extends ConsumerWidget {
                             ),
                           );
                         },
-                        child: CircleAvatar(
-                          radius: 24,
-                          backgroundImage: user?.photoUrl != null
-                              ? NetworkImage(user!.photoUrl!)
-                              : null,
-                          backgroundColor: theme.colorScheme.primary.withOpacity(0.2),
-                          child: user?.photoUrl == null
-                              ? Text(
-                                  (user?.username?[0] ?? 'U').toUpperCase(),
-                                  style: GoogleFonts.poppins(
-                                    color: theme.colorScheme.primary,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: theme.brightness == Brightness.dark
+                                  ? const Color(0xFF2A2A2A)
+                                  : Colors.grey[200]!,
+                              width: 1,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 20,
+                            backgroundColor: theme.brightness == Brightness.dark
+                                ? const Color(0xFF2A2A2A)
+                                : Colors.grey[100],
+                            child: Text(
+                              (user?.username?[0] ?? 'U').toUpperCase(),
+                              style: GoogleFonts.poppins(
+                                color: theme.textTheme.bodyLarge?.color,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
                         ),
                       ),
-                      loading: () => CircleAvatar(
-                        radius: 24,
-                        backgroundColor: theme.colorScheme.primary.withOpacity(0.2),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
+                      loading: () => ShimmerAvatar(radius: 20),
                       error: (_, __) => CircleAvatar(
-                        radius: 24,
-                        backgroundColor: theme.colorScheme.error.withOpacity(0.2),
-                        child: Icon(Icons.error, color: theme.colorScheme.error),
+                        radius: 20,
+                        backgroundColor: theme.brightness == Brightness.dark
+                            ? const Color(0xFF2A2A2A)
+                            : Colors.grey[100],
+                        child: Text(
+                          'U',
+                          style: GoogleFonts.poppins(
+                            color: theme.textTheme.bodyLarge?.color,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
                     );
                   },
@@ -122,40 +125,38 @@ class PostCard extends ConsumerWidget {
                           final userAsync = ref.watch(userProvider(post.userId));
                           return userAsync.when(
                             data: (user) => Text(
-                              user?.name?.isNotEmpty == true 
-                                  ? user!.name! 
-                                  : user?.username ?? 'Unknown User',
+                              user?.username ?? 'Unknown User',
                               style: GoogleFonts.poppins(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                color: theme.colorScheme.onSurface,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: theme.textTheme.bodyLarge?.color,
+                                letterSpacing: -0.3,
                               ),
                             ),
-                            loading: () => Container(
-                              width: 100,
-                              height: 16,
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primary.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                            ),
+                            loading: () => ShimmerText(width: 120, height: 20),
                             error: (_, __) => Text(
                               'Unknown User',
                               style: GoogleFonts.poppins(
-                                color: theme.colorScheme.error,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                color: theme.textTheme.bodyLarge?.color,
+                                letterSpacing: -0.3,
                               ),
                             ),
                           );
                         },
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       Text(
-                        DateFormat('MMM d, y').format(
-                          DateTime.fromMillisecondsSinceEpoch(post.timestamp),
+                        DateFormat('MMM d, y h:mm a').format(
+                          DateTime.fromMillisecondsSinceEpoch(
+                            post.timestamp * 1000,
+                          ),
                         ),
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          color: theme.colorScheme.onSurface.withOpacity(0.6),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: theme.textTheme.bodyMedium?.color,
+                          letterSpacing: -0.3,
                         ),
                       ),
                     ],
@@ -164,163 +165,198 @@ class PostCard extends ConsumerWidget {
               ],
             ),
           ),
-
-          // Post Content
-          if (post.imageUrl != null) ...[
-            Container(
-              width: double.infinity,
-              constraints: const BoxConstraints(maxHeight: 300),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.network(
-                  post.imageUrl!,
-                  fit: BoxFit.cover,
+          if (post.content.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Text(
+                post.content,
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  color: theme.textTheme.bodyLarge?.color,
+                  height: 1.3,
+                  letterSpacing: -0.3,
                 ),
               ),
             ),
-            const SizedBox(height: 12),
-          ],
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              post.content,
-              style: GoogleFonts.poppins(
-                fontSize: 15,
-                color: theme.colorScheme.onSurface,
-                height: 1.4,
+          if (post.imageUrl != null)
+            Container(
+              constraints: const BoxConstraints(
+                maxHeight: 300,
+              ),
+              decoration: BoxDecoration(
+                border: Border(
+                  top: BorderSide(
+                    color: theme.brightness == Brightness.dark
+                        ? const Color(0xFF2A2A2A)
+                        : Colors.grey[200]!,
+                    width: 1,
+                  ),
+                  bottom: BorderSide(
+                    color: theme.brightness == Brightness.dark
+                        ? const Color(0xFF2A2A2A)
+                        : Colors.grey[200]!,
+                    width: 1,
+                  ),
+                ),
+              ),
+              child: Image.network(
+                post.imageUrl!,
+                width: double.infinity,
+                fit: BoxFit.cover,
               ),
             ),
-          ),
-
-          const SizedBox(height: 12),
-
-          // Actions Row
           Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            padding: const EdgeInsets.all(16),
             child: Row(
               children: [
-                // Like button that shows reactions popup
-                Consumer(
-                  builder: (context, ref, child) {
-                    final userReactionAsync = ref.watch(userReactionProvider(post.id));
-                    final reactionsAsync = ref.watch(postReactionsProvider(post.id));
-                    final reactions = ref.watch(reactionsProvider);
-
-                    return GestureDetector(
-                      onLongPressStart: (details) {
-                        _showReactionsPopup(context, ref, details.globalPosition);
-                      },
-                      onTapUp: (details) {
-                        // Toggle like on tap
-                        ref.read(reactionsProvider.notifier).toggleReaction(post.id, 'like');
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: userReactionAsync.when(
-                            data: (reaction) => reaction != null
-                                ? theme.colorScheme.primary.withOpacity(0.15)
-                                : theme.brightness == Brightness.dark
-                                    ? Colors.grey[800]!.withOpacity(0.5)
-                                    : theme.colorScheme.surface.withOpacity(0.1),
-                            loading: () => theme.brightness == Brightness.dark
-                                ? Colors.grey[800]!.withOpacity(0.5)
-                                : theme.colorScheme.surface.withOpacity(0.1),
-                            error: (_, __) => theme.brightness == Brightness.dark
-                                ? Colors.grey[800]!.withOpacity(0.5)
-                                : theme.colorScheme.surface.withOpacity(0.1),
-                          ),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: theme.brightness == Brightness.dark
-                                ? Colors.grey[700]!
-                                : Colors.transparent,
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            userReactionAsync.when(
-                              data: (reaction) => Text(
-                                reaction?.type != null 
-                                    ? reactionEmojis[reaction!.type]! 
-                                    : '👍',
-                                style: const TextStyle(fontSize: 18),
-                              ),
-                              loading: () => const Text('👍', style: TextStyle(fontSize: 18)),
-                              error: (_, __) => const Text('👍', style: TextStyle(fontSize: 18)),
-                            ),
-                            const SizedBox(width: 8),
-                            if (ref.read(reactionsProvider.notifier).isLoading(post.id, userReactionAsync.when(
-                              data: (reaction) => reaction?.type ?? 'like',
-                              loading: () => 'like',
-                              error: (_, __) => 'like',
-                            )))
-                              SizedBox(
-                                width: 12,
-                                height: 12,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              )
-                            else
-                              Text(
-                                reactionsAsync.when(
-                                  data: (counts) => counts.values.fold(0, (sum, count) => sum + count).toString(),
-                                  loading: () => '0',
-                                  error: (_, __) => '0',
-                                ),
-                                style: GoogleFonts.poppins(
-                                  color: theme.colorScheme.onSurface,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
+                GestureDetector(
+                  onTap: () async {
+                    final hasReacted = userReactionAsync?.type == ReactionType.like;
+                    if (hasReacted) {
+                      await ref.read(reactionsProvider.notifier).removeReaction(post.id);
+                    } else {
+                      await ref.read(reactionsProvider.notifier).addReaction(
+                            post.id,
+                            ReactionType.like,
+                          );
+                    }
                   },
-                ),
-
-                const Spacer(),
-
-                if (showComments)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: theme.brightness == Brightness.dark
-                          ? Colors.grey[800]!.withOpacity(0.5)
-                          : theme.colorScheme.surface.withOpacity(0.1),
+                      color: userReactionAsync?.type == ReactionType.like
+                          ? theme.colorScheme.primary.withOpacity(0.1)
+                          : theme.brightness == Brightness.dark
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.grey[100],
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: theme.brightness == Brightness.dark
-                            ? Colors.grey[700]!
-                            : Colors.transparent,
+                        color: userReactionAsync?.type == ReactionType.like
+                            ? theme.colorScheme.primary.withOpacity(0.5)
+                            : theme.brightness == Brightness.dark
+                                ? const Color(0xFF3A3A3A)
+                                : Colors.grey[300]!,
                         width: 1,
                       ),
                     ),
                     child: Row(
-                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
-                          Icons.chat_bubble_outline,
+                          userReactionAsync?.type == ReactionType.like
+                              ? Icons.thumb_up
+                              : Icons.thumb_up_outlined,
                           size: 18,
-                          color: theme.colorScheme.onSurface,
+                          color: userReactionAsync?.type == ReactionType.like
+                              ? theme.colorScheme.primary
+                              : theme.textTheme.bodyMedium?.color,
                         ),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 6),
                         Text(
-                          '${post.comments}',
-                          style: GoogleFonts.poppins(
-                            color: theme.colorScheme.onSurface,
+                          reactionsAsync.when(
+                            data: (reactions) => reactions
+                                .where((r) => r.type == ReactionType.like)
+                                .length
+                                .toString(),
+                            loading: () => '...',
+                            error: (_, __) => '0',
+                          ),
+                          style: TextStyle(
+                            color: userReactionAsync?.type == ReactionType.like
+                                ? theme.colorScheme.primary
+                                : theme.textTheme.bodyMedium?.color,
+                            fontSize: 13,
                             fontWeight: FontWeight.w500,
+                            letterSpacing: -0.3,
                           ),
                         ),
                       ],
                     ),
                   ),
+                ),
+                const SizedBox(width: 8),
+                GestureDetector(
+                  onTap: () async {
+                    final hasReacted = userReactionAsync?.type == ReactionType.love;
+                    if (hasReacted) {
+                      await ref.read(reactionsProvider.notifier).removeReaction(post.id);
+                    } else {
+                      await ref.read(reactionsProvider.notifier).addReaction(
+                            post.id,
+                            ReactionType.love,
+                          );
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: userReactionAsync?.type == ReactionType.love
+                          ? Colors.red.withOpacity(0.1)
+                          : theme.brightness == Brightness.dark
+                              ? const Color(0xFF2A2A2A)
+                              : Colors.grey[100],
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: userReactionAsync?.type == ReactionType.love
+                            ? Colors.red.withOpacity(0.5)
+                            : theme.brightness == Brightness.dark
+                                ? const Color(0xFF3A3A3A)
+                                : Colors.grey[300]!,
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          userReactionAsync?.type == ReactionType.love
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                          size: 18,
+                          color: userReactionAsync?.type == ReactionType.love
+                              ? Colors.red
+                              : theme.textTheme.bodyMedium?.color,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          reactionsAsync.when(
+                            data: (reactions) => reactions
+                                .where((r) => r.type == ReactionType.love)
+                                .length
+                                .toString(),
+                            loading: () => '...',
+                            error: (_, __) => '0',
+                          ),
+                          style: TextStyle(
+                            color: userReactionAsync?.type == ReactionType.love
+                                ? Colors.red
+                                : theme.textTheme.bodyMedium?.color,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.chat_bubble_outline,
+                      size: 18,
+                      color: theme.textTheme.bodyMedium?.color,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      post.comments.toString(),
+                      style: TextStyle(
+                        color: theme.textTheme.bodyMedium?.color,
+                        fontSize: 13,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -328,64 +364,65 @@ class PostCard extends ConsumerWidget {
       ),
     );
   }
+}
 
-  void _showReactionsPopup(BuildContext context, WidgetRef ref, Offset position) {
-    final theme = Theme.of(context);
-    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-    
-    showMenu(
-      context: context,
-      position: RelativeRect.fromRect(
-        position & const Size(40, 40),
-        Offset.zero & overlay.size,
+class ShimmerAvatar extends StatelessWidget {
+  final double radius;
+
+  const ShimmerAvatar({Key? key, required this.radius}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: radius * 2,
+      height: radius * 2,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: Colors.grey[300],
       ),
-      color: theme.brightness == Brightness.dark
-          ? const Color.fromARGB(255, 3, 3, 3)
-          : theme.colorScheme.surface,
-      elevation: theme.brightness == Brightness.dark ? 16 : 8,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: BorderSide(
-          color: theme.brightness == Brightness.dark
-              ? Colors.grey[700]!
-              : Colors.transparent,
-          width: 1,
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          width: radius * 2,
+          height: radius * 2,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.grey[300],
+          ),
         ),
       ),
-      items: reactionEmojis.entries.map((entry) {
-        final isLoading = ref.watch(reactionsProvider.select(
-          (state) => state['${post.id}:${entry.key}'] ?? false,
-        ));
+    );
+  }
+}
 
-        return PopupMenuItem(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          enabled: !isLoading,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                entry.value,
-                style: const TextStyle(fontSize: 24),
-              ),
-              if (isLoading) ...[
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 12,
-                  height: 12,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-              ],
-            ],
+class ShimmerText extends StatelessWidget {
+  final double width;
+  final double height;
+
+  const ShimmerText({Key? key, required this.width, required this.height}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey[300]!,
+        highlightColor: Colors.grey[100]!,
+        child: Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: Colors.grey[300],
+            borderRadius: BorderRadius.circular(8),
           ),
-          onTap: () {
-            ref.read(reactionsProvider.notifier).toggleReaction(post.id, entry.key);
-          },
-        );
-      }).toList(),
+        ),
+      ),
     );
   }
 }

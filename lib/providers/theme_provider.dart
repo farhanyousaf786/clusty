@@ -17,19 +17,19 @@ class ThemeNotifier extends StateNotifier<ThemeData> {
   static final _darkTheme = ThemeData(
     brightness: Brightness.dark,
     primaryColor: Colors.blue[400],
-    scaffoldBackgroundColor: Colors.black,
+    scaffoldBackgroundColor: const Color(0xFF000000),
     colorScheme: ColorScheme.dark(
       primary: Colors.blue[400]!,
       secondary: Colors.purple[400]!,
-      surface: Colors.blue[900]!.withOpacity(0.2),
-      background: Colors.black,
+      surface: const Color(0xFF1A1A1A),
+      background: const Color(0xFF000000),
     ),
-    cardColor: Colors.blue[900]!.withOpacity(0.2),
-    dividerColor: Colors.blue[400]!.withOpacity(0.3),
+    cardColor: const Color(0xFF1A1A1A),
+    dividerColor: Colors.grey[800]!,
     textTheme: TextTheme(
       displayLarge: TextStyle(color: Colors.blue[400]),
       bodyLarge: const TextStyle(color: Colors.white),
-      bodyMedium: const TextStyle(color: Colors.white70),
+      bodyMedium: TextStyle(color: Colors.grey[400]),
     ),
   );
 
