@@ -1,215 +1,211 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/intl.dart';
-import 'package:shimmer/shimmer.dart';
-import '../models/post_model.dart';
 import '../models/reaction_type.dart';
+import '../providers/auth_provider.dart';
 import '../providers/reactions_provider.dart';
 import '../providers/comments_provider.dart';
-import '../providers/auth_provider.dart';
-import '../providers/user_provider.dart';
-import '../screens/user_profile/user_profile_screen.dart';
 import '../providers/theme_provider.dart';
+import '../screens/comments_screen.dart';
+import '../screens/profile_screen.dart';
 import '../utils/time_ago_utils.dart';
-import 'shimmer_widgets.dart';
-import 'comments_sheet.dart'; // Import the CommentsSheet widget
+import '../widgets/shimmer_widget.dart';
+import '../widgets/comments_bottom_sheet.dart';
 
 class PostCard extends ConsumerWidget {
-  final PostModel post;
-  final bool showComments;
-  final VoidCallback? onCommentTap;
+  final dynamic post;
+  final VoidCallback? onDelete;
 
   const PostCard({
     super.key,
     required this.post,
-    this.showComments = true,
-    this.onCommentTap,
+    this.onDelete,
   });
 
-  static const reactionEmojis = {
-    'like': '',
-    'love': '',
-    'haha': '',
-    'wow': '',
-    'sad': '',
-    'angry': '',
-  };
+  void _navigateToProfile(BuildContext context, String userId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProfileScreen(userId: userId),
+      ),
+    );
+  }
+
+  void _showFullImage(BuildContext context, String imageUrl) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(),
+          body: Center(
+            child: Image.network(imageUrl),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _deletePost(BuildContext context) {
+    onDelete?.call();
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = ref.watch(themeProvider);
-    final userReactionAsync = ref.watch(userReactionProvider(post.id));
+    final currentUser = ref.watch(authProvider).value;
     final reactionsAsync = ref.watch(postReactionsProvider(post.id));
+    final userReactionAsync = ref.watch(userReactionProvider(post.id));
     final reactions = ref.watch(reactionsProvider);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.brightness == Brightness.dark
-              ? const Color(0xFF2A2A2A)
-              : Colors.grey[200]!,
-          width: 1,
-        ),
-      ),
+    return Card(
+      color: theme.colorScheme.surfaceVariant,
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
+          // Header
+          Container(
+            color: theme.colorScheme.surfaceVariant,
+            padding: const EdgeInsets.all(8),
             child: Row(
               children: [
-                Consumer(
-                  builder: (context, ref, child) {
-                    final userAsync = ref.watch(userProvider(post.userId));
-                    return userAsync.when(
-                      data: (user) => GestureDetector(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => UserProfileScreen(userId: post.userId),
-                            ),
-                          );
-                        },
-                        child: Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: theme.brightness == Brightness.dark
-                                  ? const Color(0xFF2A2A2A)
-                                  : Colors.grey[200]!,
-                              width: 1,
-                            ),
-                          ),
-                          child: CircleAvatar(
-                            radius: 20,
-                            backgroundColor: theme.brightness == Brightness.dark
-                                ? const Color(0xFF2A2A2A)
-                                : Colors.grey[100],
-                            child: Text(
-                              (user?.username?[0] ?? 'U').toUpperCase(),
-                              style: GoogleFonts.poppins(
-                                color: theme.textTheme.bodyLarge?.color,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      loading: () => ShimmerAvatar(radius: 20),
-                      error: (_, __) => CircleAvatar(
-                        radius: 20,
-                        backgroundColor: theme.brightness == Brightness.dark
-                            ? const Color(0xFF2A2A2A)
-                            : Colors.grey[100],
-                        child: Text(
-                          'U',
-                          style: GoogleFonts.poppins(
-                            color: theme.textTheme.bodyLarge?.color,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
+                GestureDetector(
+                  onTap: () => _navigateToProfile(context, post.userId),
+                  child: CircleAvatar(
+                    backgroundImage: post.userPhotoUrl != null
+                        ? NetworkImage(post.userPhotoUrl!)
+                        : null,
+                    child: post.userPhotoUrl == null
+                        ? Icon(Icons.person, color: theme.colorScheme.onSurfaceVariant)
+                        : null,
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Consumer(
-                        builder: (context, ref, child) {
-                          final userAsync = ref.watch(userProvider(post.userId));
-                          return userAsync.when(
-                            data: (user) => Text(
-                              user?.username ?? 'Unknown User',
-                              style: GoogleFonts.poppins(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: theme.textTheme.bodyLarge?.color,
-                                letterSpacing: -0.3,
-                              ),
+                  child: GestureDetector(
+                    onTap: () => _navigateToProfile(context, post.userId),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          post.username,
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        Text(
+                          TimeAgoUtils.getTimeAgo(post.timestamp),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Chip(
+                  avatar: Icon(
+                    post.category.icon,
+                    size: 16,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  label: Text(
+                    post.category.displayName,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  backgroundColor: theme.colorScheme.surface.withOpacity(0.5),
+                  padding: EdgeInsets.zero,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                if (post.userId == currentUser?.id)
+                  PopupMenuButton<String>(
+                    icon: Icon(
+                      Icons.more_vert,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    onSelected: (value) {
+                      if (value == 'delete') {
+                        _deletePost(context);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, color: theme.colorScheme.error),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Delete',
+                              style: TextStyle(color: theme.colorScheme.error),
                             ),
-                            loading: () => ShimmerText(width: 120, height: 20),
-                            error: (_, __) => Text(
-                              'Unknown User',
-                              style: GoogleFonts.poppins(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: theme.textTheme.bodyLarge?.color,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        TimeAgoUtils.getTimeAgo(post.timestamp),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: theme.textTheme.bodyMedium?.color,
-                          letterSpacing: -0.3,
+                          ],
                         ),
                       ),
                     ],
                   ),
-                ),
               ],
             ),
           ),
+
+          // Content
           if (post.content.isNotEmpty)
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              padding: const EdgeInsets.all(8),
               child: Text(
                 post.content,
-                style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  color: theme.textTheme.bodyLarge?.color,
-                  height: 1.3,
-                  letterSpacing: -0.3,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
+
+          // Image
           if (post.imageUrl != null)
-            Container(
-              constraints: const BoxConstraints(
-                maxHeight: 300,
-              ),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(
-                    color: theme.brightness == Brightness.dark
-                        ? const Color(0xFF2A2A2A)
-                        : Colors.grey[200]!,
-                    width: 1,
-                  ),
-                  bottom: BorderSide(
-                    color: theme.brightness == Brightness.dark
-                        ? const Color(0xFF2A2A2A)
-                        : Colors.grey[200]!,
-                    width: 1,
-                  ),
+            GestureDetector(
+              onTap: () => _showFullImage(context, post.imageUrl!),
+              child: Container(
+                constraints: const BoxConstraints(maxHeight: 400),
+                width: double.infinity,
+                child: Image.network(
+                  post.imageUrl!,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Center(
+                      child: CircularProgressIndicator(
+                        value: loadingProgress.expectedTotalBytes != null
+                            ? loadingProgress.cumulativeBytesLoaded /
+                                loadingProgress.expectedTotalBytes!
+                            : null,
+                      ),
+                    );
+                  },
                 ),
               ),
-              child: Image.network(
-                post.imageUrl!,
-                width: double.infinity,
-                fit: BoxFit.cover,
-              ),
             ),
-          Padding(
-            padding: const EdgeInsets.all(16),
+
+          // Footer
+          Container(
+            color: theme.colorScheme.surfaceVariant,
+            padding: const EdgeInsets.all(8),
             child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                GestureDetector(
+                _buildActionButton(
+                  icon: Icons.thumb_up,
+                  label: reactionsAsync.when(
+                    data: (reactions) => reactions
+                        .where((r) => r.type == ReactionType.like)
+                        .length
+                        .toString(),
+                    loading: () => '...',
+                    error: (_, __) => '0',
+                  ),
+                  isActive: userReactionAsync?.type == ReactionType.like,
                   onTap: () async {
                     final hasReacted = userReactionAsync?.type == ReactionType.like;
                     if (hasReacted) {
@@ -221,180 +217,34 @@ class PostCard extends ConsumerWidget {
                           );
                     }
                   },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: userReactionAsync?.type == ReactionType.like
-                          ? theme.colorScheme.primary.withOpacity(0.1)
-                          : theme.brightness == Brightness.dark
-                              ? const Color(0xFF2A2A2A)
-                              : Colors.grey[100],
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: userReactionAsync?.type == ReactionType.like
-                            ? theme.colorScheme.primary.withOpacity(0.5)
-                            : theme.brightness == Brightness.dark
-                                ? const Color(0xFF3A3A3A)
-                                : Colors.grey[300]!,
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          userReactionAsync?.type == ReactionType.like
-                              ? Icons.thumb_up
-                              : Icons.thumb_up_outlined,
-                          size: 18,
-                          color: userReactionAsync?.type == ReactionType.like
-                              ? theme.colorScheme.primary
-                              : theme.textTheme.bodyMedium?.color,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          reactionsAsync.when(
-                            data: (reactions) => reactions
-                                .where((r) => r.type == ReactionType.like)
-                                .length
-                                .toString(),
-                            loading: () => '...',
-                            error: (_, __) => '0',
-                          ),
-                          style: TextStyle(
-                            color: userReactionAsync?.type == ReactionType.like
-                                ? theme.colorScheme.primary
-                                : theme.textTheme.bodyMedium?.color,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  theme: theme,
                 ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () async {
-                    final hasReacted = userReactionAsync?.type == ReactionType.love;
-                    if (hasReacted) {
-                      await ref.read(reactionsProvider.notifier).removeReaction(post.id);
-                    } else {
-                      await ref.read(reactionsProvider.notifier).addReaction(
-                            post.id,
-                            ReactionType.love,
-                          );
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: userReactionAsync?.type == ReactionType.love
-                          ? Colors.red.withOpacity(0.1)
-                          : theme.brightness == Brightness.dark
-                              ? const Color(0xFF2A2A2A)
-                              : Colors.grey[100],
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: userReactionAsync?.type == ReactionType.love
-                            ? Colors.red.withOpacity(0.5)
-                            : theme.brightness == Brightness.dark
-                                ? const Color(0xFF3A3A3A)
-                                : Colors.grey[300]!,
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          userReactionAsync?.type == ReactionType.love
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          size: 18,
-                          color: userReactionAsync?.type == ReactionType.love
-                              ? Colors.red
-                              : theme.textTheme.bodyMedium?.color,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          reactionsAsync.when(
-                            data: (reactions) => reactions
-                                .where((r) => r.type == ReactionType.love)
-                                .length
-                                .toString(),
-                            loading: () => '...',
-                            error: (_, __) => '0',
-                          ),
-                          style: TextStyle(
-                            color: userReactionAsync?.type == ReactionType.love
-                                ? Colors.red
-                                : theme.textTheme.bodyMedium?.color,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: -0.3,
-                          ),
-                        ),
-                      ],
-                    ),
+                _buildActionButton(
+                  icon: Icons.comment,
+                  label: ref.watch(postCommentsProvider(post.id)).when(
+                    data: (comments) => comments.length.toString(),
+                    loading: () => '...',
+                    error: (_, __) => '0',
                   ),
-                ),
-                const SizedBox(width: 16),
-                GestureDetector(
+                  isActive: false,
                   onTap: () {
                     showModalBottomSheet(
                       context: context,
                       isScrollControlled: true,
                       backgroundColor: Colors.transparent,
-                      builder: (context) => Padding(
-                        padding: EdgeInsets.only(
-                          bottom: MediaQuery.of(context).viewInsets.bottom,
-                        ),
-                        child: CommentsSheet(postId: post.id),
+                      builder: (context) => CommentsBottomSheet(
+                        postId: post.id,
                       ),
                     );
                   },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: theme.brightness == Brightness.dark
-                          ? const Color(0xFF2A2A2A)
-                          : Colors.grey[100],
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: theme.brightness == Brightness.dark
-                            ? const Color(0xFF3A3A3A)
-                            : Colors.grey[300]!,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.chat_bubble_outline_rounded,
-                          size: 18,
-                          color: theme.textTheme.bodyMedium?.color,
-                        ),
-                        const SizedBox(width: 6),
-                        Consumer(
-                          builder: (context, ref, child) {
-                            final commentsAsync = ref.watch(postCommentsProvider(post.id));
-                            return Text(
-                              commentsAsync.when(
-                                data: (comments) => comments.length.toString(),
-                                loading: () => '...',
-                                error: (_, __) => '0',
-                              ),
-                              style: TextStyle(
-                                color: theme.textTheme.bodyMedium?.color,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w500,
-                                letterSpacing: -0.3,
-                              ),
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
+                  theme: theme,
+                ),
+                _buildActionButton(
+                  icon: Icons.share,
+                  label: 'Share',
+                  isActive: false,
+                  onTap: () {},
+                  theme: theme,
                 ),
               ],
             ),
@@ -403,63 +253,37 @@ class PostCard extends ConsumerWidget {
       ),
     );
   }
-}
 
-class ShimmerAvatar extends StatelessWidget {
-  final double radius;
-
-  const ShimmerAvatar({Key? key, required this.radius}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: radius * 2,
-      height: radius * 2,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: Colors.grey[300],
-      ),
-      child: Shimmer.fromColors(
-        baseColor: Colors.grey[300]!,
-        highlightColor: Colors.grey[100]!,
-        child: Container(
-          width: radius * 2,
-          height: radius * 2,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.grey[300],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class ShimmerText extends StatelessWidget {
-  final double width;
-  final double height;
-
-  const ShimmerText({Key? key, required this.width, required this.height}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: Colors.grey[300],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Shimmer.fromColors(
-        baseColor: Colors.grey[300]!,
-        highlightColor: Colors.grey[100]!,
-        child: Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            color: Colors.grey[300],
-            borderRadius: BorderRadius.circular(8),
-          ),
+  Widget _buildActionButton({
+    required IconData icon,
+    required dynamic label,
+    required bool isActive,
+    required VoidCallback onTap,
+    required ThemeData theme,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              size: 20,
+              color: isActive
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label is String ? label : label.toString(),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: isActive
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
         ),
       ),
     );

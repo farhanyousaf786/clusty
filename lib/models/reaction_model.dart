@@ -1,8 +1,10 @@
+import 'reaction_type.dart';
+
 class ReactionModel {
   final String id;
   final String userId;
   final String postId;
-  final String type;
+  final ReactionType type;
   final int timestamp;
 
   ReactionModel({
@@ -18,7 +20,9 @@ class ReactionModel {
       id: json['id'] as String,
       userId: json['userId'] as String,
       postId: json['postId'] as String,
-      type: json['type'] as String,
+      type: ReactionType.values.firstWhere(
+        (e) => e.toString().split('.').last == json['type'],
+      ),
       timestamp: json['timestamp'] as int,
     );
   }
@@ -28,7 +32,7 @@ class ReactionModel {
       'id': id,
       'userId': userId,
       'postId': postId,
-      'type': type,
+      'type': type.toString().split('.').last,
       'timestamp': timestamp,
     };
   }

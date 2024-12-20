@@ -32,6 +32,7 @@ final userPostsProvider = StreamProvider.family<List<PostModel>, String?>((ref, 
           });
         }).toList();
         
+        // Sort by timestamp, handling null values
         posts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
         return posts;
       });
@@ -101,7 +102,7 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
             }
 
             // Sort posts by timestamp
-            filteredPosts.sort((a, b) => (b.timestamp ?? 0).compareTo(a.timestamp ?? 0));
+            filteredPosts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
             state = AsyncValue.data(filteredPosts);
           } catch (e, stack) {
             Logger.e('Error in posts listener', e, stack);
@@ -154,7 +155,11 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
     }
   }
 
-  Future<void> addPost(String content, {File? imageFile, bool isMeme = false}) async {
+  Future<void> addPost(String content, {
+    File? imageFile,
+    bool isMeme = false,
+    required PostCategory category,
+  }) async {
     try {
       final currentUser = _ref.read(authProvider).value;
       if (currentUser == null) throw Exception('User must be logged in to post');
@@ -180,12 +185,14 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
         likes: 0,
         comments: 0,
         timestamp: timestamp,
+        category: category,
       );
 
       // Create a multi-path update
       final updates = {
         '/posts/$postId': post.toJson(),
         '/user-posts/${currentUser.id}/$postId': post.toJson(),
+        '/category-posts/${category.name}/$postId': post.toJson(),
       };
 
       // Update all paths atomically
@@ -200,7 +207,6 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
       Logger.i('Post created successfully: $postId');
     } catch (e, stack) {
       Logger.e('Error creating post', e, stack);
-      state = AsyncValue.error(e, stack);
       rethrow;
     }
   }
