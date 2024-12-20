@@ -103,6 +103,7 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
 
             // Sort posts by timestamp
             filteredPosts.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+            
             state = AsyncValue.data(filteredPosts);
           } catch (e, stack) {
             Logger.e('Error in posts listener', e, stack);
@@ -410,6 +411,69 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
       Logger.i('Successfully unfollowed user: $userId');
     } catch (e) {
       Logger.e('Error unfollowing user', e);
+      rethrow;
+    }
+  }
+
+  Future<bool> isPostHidden(String postId) async {
+    return false;
+  }
+
+  Future<void> toggleHidePost(String postId) async {
+    throw Exception('Hide post functionality has been removed');
+  }
+
+  Future<void> deletePost(String postId) async {
+    try {
+      final currentUser = _ref.read(authProvider).value;
+      if (currentUser == null) throw Exception('User must be logged in to delete posts');
+
+      // Get post data to check ownership and image URL
+      final postSnapshot = await _postsRef.child(postId).get();
+      if (!postSnapshot.exists) throw Exception('Post not found');
+
+      final postData = Map<String, dynamic>.from(postSnapshot.value as Map);
+      if (postData['userId'] != currentUser.id) {
+        throw Exception('Not authorized to delete this post');
+      }
+
+      // Delete image from storage if exists
+      if (postData['imageUrl'] != null) {
+        try {
+          final imageRef = _storage.refFromURL(postData['imageUrl']);
+          await imageRef.delete();
+        } catch (e) {
+          Logger.e('Error deleting post image', e);
+          // Continue with post deletion even if image deletion fails
+        }
+      }
+
+      // Delete post data
+      await _postsRef.child(postId).remove();
+
+      // Delete post likes
+      await _database.ref().child('post-likes/$postId').remove();
+
+      // Delete post comments
+      await _database.ref().child('post-comments/$postId').remove();
+
+      // Update user's post count
+      final userRef = _database.ref().child('users/${currentUser.id}');
+      await userRef.child('postsCount').runTransaction((Object? value) {
+        final currentCount = value as int? ?? 0;
+        return rtdb.Transaction.success(currentCount > 0 ? currentCount - 1 : 0);
+      });
+
+      // Update state
+      if (state.hasValue) {
+        state = AsyncValue.data(
+          state.value!.where((post) => post.id != postId).toList(),
+        );
+      }
+
+      Logger.i('Post deleted successfully: $postId');
+    } catch (e, stack) {
+      Logger.e('Error deleting post', e, stack);
       rethrow;
     }
   }

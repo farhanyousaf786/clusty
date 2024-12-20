@@ -56,10 +56,11 @@ class PostModel {
   final String content;
   final String? imageUrl;
   final bool isMeme;
-  final int likes;
-  final int comments;
   final int timestamp;
   final PostCategory category;
+  final bool isHidden;
+  final int comments;
+  final int likes;
 
   PostModel({
     required this.id,
@@ -68,46 +69,13 @@ class PostModel {
     this.userPhotoUrl,
     required this.content,
     this.imageUrl,
-    this.isMeme = false,
-    this.likes = 0,
-    this.comments = 0,
+    required this.isMeme,
     required this.timestamp,
-    this.category = PostCategory.casual,
+    required this.category,
+    this.isHidden = false,
+    this.comments = 0,
+    this.likes = 0,
   });
-
-  factory PostModel.fromJson(Map<String, dynamic> json) {
-    return PostModel(
-      id: json['id'] as String,
-      userId: json['userId'] as String,
-      username: json['username'] as String,
-      userPhotoUrl: json['userPhotoUrl'] as String?,
-      content: json['content'] as String,
-      imageUrl: json['imageUrl'] as String?,
-      isMeme: json['isMeme'] as bool? ?? false,
-      likes: json['likes'] as int? ?? 0,
-      comments: json['comments'] as int? ?? 0,
-      timestamp: json['timestamp'] as int? ?? DateTime.now().millisecondsSinceEpoch,
-      category: PostCategory.values.firstWhere(
-        (e) => e.name == (json['category'] as String? ?? PostCategory.casual.name),
-        orElse: () => PostCategory.casual,
-      ),
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'userId': userId,
-      'username': username,
-      'userPhotoUrl': userPhotoUrl,
-      'content': content,
-      'imageUrl': imageUrl,
-      'isMeme': isMeme,
-      'likes': likes,
-      'comments': comments,
-      'timestamp': timestamp,
-      'category': category.name,
-    };
-  }
 
   PostModel copyWith({
     String? id,
@@ -117,10 +85,11 @@ class PostModel {
     String? content,
     String? imageUrl,
     bool? isMeme,
-    int? likes,
-    int? comments,
     int? timestamp,
     PostCategory? category,
+    bool? isHidden,
+    int? comments,
+    int? likes,
   }) {
     return PostModel(
       id: id ?? this.id,
@@ -130,10 +99,48 @@ class PostModel {
       content: content ?? this.content,
       imageUrl: imageUrl ?? this.imageUrl,
       isMeme: isMeme ?? this.isMeme,
-      likes: likes ?? this.likes,
-      comments: comments ?? this.comments,
       timestamp: timestamp ?? this.timestamp,
       category: category ?? this.category,
+      isHidden: isHidden ?? this.isHidden,
+      comments: comments ?? this.comments,
+      likes: likes ?? this.likes,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'userId': userId,
+      'username': username,
+      'userPhotoUrl': userPhotoUrl,
+      'content': content,
+      'imageUrl': imageUrl,
+      'isMeme': isMeme,
+      'timestamp': timestamp,
+      'category': category.name,
+      'isHidden': isHidden,
+      'comments': comments,
+      'likes': likes,
+    };
+  }
+
+  factory PostModel.fromJson(Map<String, dynamic> json) {
+    return PostModel(
+      id: json['id'] as String,
+      userId: json['userId'] as String,
+      username: json['username'] as String,
+      userPhotoUrl: json['userPhotoUrl'] as String?,
+      content: json['content'] as String,
+      imageUrl: json['imageUrl'] as String?,
+      isMeme: json['isMeme'] as bool,
+      timestamp: json['timestamp'] as int,
+      category: PostCategory.values.firstWhere(
+        (e) => e.name == (json['category'] as String? ?? PostCategory.casual.name),
+        orElse: () => PostCategory.casual,
+      ),
+      isHidden: json['isHidden'] as bool? ?? false,
+      comments: json['comments'] as int? ?? 0,
+      likes: json['likes'] as int? ?? 0,
     );
   }
 }

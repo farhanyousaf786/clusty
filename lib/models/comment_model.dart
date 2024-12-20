@@ -4,6 +4,8 @@ class CommentModel {
   final String postId;
   final String content;
   final int timestamp;
+  final String username;
+  final String? userPhotoUrl;
 
   CommentModel({
     required this.id,
@@ -11,24 +13,30 @@ class CommentModel {
     required this.postId,
     required this.content,
     required this.timestamp,
+    required this.username,
+    this.userPhotoUrl,
   });
 
-  factory CommentModel.fromMap(Map<String, dynamic> map, String id) {
+  factory CommentModel.fromJson(Map<String, dynamic> json, String id) {
     return CommentModel(
       id: id,
-      userId: map['userId'] as String,
-      postId: map['postId'] as String,
-      content: map['content'] as String,
-      timestamp: map['timestamp'] as int,
+      userId: json['userId'] as String,
+      postId: json['postId'] as String,
+      content: json['content'] as String,
+      timestamp: json['timestamp'] as int,
+      username: json['username'] as String,
+      userPhotoUrl: json['userPhotoUrl'] as String?,
     );
   }
 
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toJson() {
     return {
       'userId': userId,
       'postId': postId,
       'content': content,
       'timestamp': timestamp,
+      'username': username,
+      'userPhotoUrl': userPhotoUrl,
     };
   }
 }

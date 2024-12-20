@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/post_model.dart';
 import '../models/reaction_type.dart';
 import '../providers/auth_provider.dart';
-import '../providers/reactions_provider.dart';
 import '../providers/comments_provider.dart';
+import '../providers/posts_provider.dart';
+import '../providers/reactions_provider.dart';
 import '../providers/theme_provider.dart';
 import '../screens/comments_screen.dart';
 import '../screens/profile_screen.dart';
 import '../utils/time_ago_utils.dart';
 import '../widgets/shimmer_widget.dart';
 import '../widgets/comments_bottom_sheet.dart';
+import '../widgets/comments_sheet.dart';
 
 class PostCard extends ConsumerWidget {
   final dynamic post;
@@ -48,13 +51,54 @@ class PostCard extends ConsumerWidget {
     onDelete?.call();
   }
 
+  void _showPostOptions(BuildContext context, WidgetRef ref) {
+    final currentUser = ref.read(authProvider).value;
+    if (currentUser == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (post.userId == currentUser.id)
+              ListTile(
+                leading: const Icon(Icons.delete),
+                title: const Text('Delete Post'),
+                onTap: () async {
+                  Navigator.pop(context);
+                  try {
+                    await ref.read(postsProvider.notifier).deletePost(post.id);
+                  } catch (e) {
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(e.toString())),
+                      );
+                    }
+                  }
+                },
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = ref.watch(themeProvider);
     final currentUser = ref.watch(authProvider).value;
-    final reactionsAsync = ref.watch(postReactionsProvider(post.id));
-    final userReactionAsync = ref.watch(userReactionProvider(post.id));
-    final reactions = ref.watch(reactionsProvider);
+    final reactionsState = ref.watch(reactionsProvider);
+    final commentsAsync = ref.watch(postCommentsProvider(post.id));
+    final userReaction = currentUser?.id != null
+        ? reactionsState.reactions
+            .where((r) => r.userId == currentUser?.id && r.postId == post.id)
+            .firstOrNull
+        : null;
+
+    final postReactions = reactionsState.reactions
+        .where((r) => r.postId == post.id)
+        .toList();
 
     return Card(
       color: theme.colorScheme.surfaceVariant,
@@ -121,31 +165,12 @@ class PostCard extends ConsumerWidget {
                   materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 if (post.userId == currentUser?.id)
-                  PopupMenuButton<String>(
+                  IconButton(
                     icon: Icon(
                       Icons.more_vert,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
-                    onSelected: (value) {
-                      if (value == 'delete') {
-                        _deletePost(context);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete, color: theme.colorScheme.error),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Delete',
-                              style: TextStyle(color: theme.colorScheme.error),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                    onPressed: () => _showPostOptions(context, ref),
                   ),
               ],
             ),
@@ -189,102 +214,75 @@ class PostCard extends ConsumerWidget {
             ),
 
           // Footer
-          Container(
-            color: theme.colorScheme.surfaceVariant,
-            padding: const EdgeInsets.all(8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildActionButton(
-                  icon: Icons.thumb_up,
-                  label: reactionsAsync.when(
-                    data: (reactions) => reactions
-                        .where((r) => r.type == ReactionType.like)
-                        .length
-                        .toString(),
-                    loading: () => '...',
-                    error: (_, __) => '0',
-                  ),
-                  isActive: userReactionAsync?.type == ReactionType.like,
-                  onTap: () async {
-                    final hasReacted = userReactionAsync?.type == ReactionType.like;
-                    if (hasReacted) {
-                      await ref.read(reactionsProvider.notifier).removeReaction(post.id);
-                    } else {
-                      await ref.read(reactionsProvider.notifier).addReaction(
-                            post.id,
-                            ReactionType.like,
-                          );
-                    }
-                  },
-                  theme: theme,
-                ),
-                _buildActionButton(
-                  icon: Icons.comment,
-                  label: ref.watch(postCommentsProvider(post.id)).when(
-                    data: (comments) => comments.length.toString(),
-                    loading: () => '...',
-                    error: (_, __) => '0',
-                  ),
-                  isActive: false,
-                  onTap: () {
-                    showModalBottomSheet(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (context) => CommentsBottomSheet(
-                        postId: post.id,
+                // Like button
+                Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.thumb_up,
+                        color: userReaction?.type == ReactionType.like
+                            ? theme.colorScheme.primary
+                            : theme.colorScheme.onSurfaceVariant,
                       ),
-                    );
-                  },
-                  theme: theme,
+                      onPressed: () async {
+                        if (userReaction?.type == ReactionType.like) {
+                          await ref.read(reactionsProvider.notifier).removeReaction(post.id);
+                        } else {
+                          await ref.read(reactionsProvider.notifier).addReaction(
+                                post.id,
+                                ReactionType.like,
+                              );
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      postReactions
+                          .where((r) => r.type == ReactionType.like)
+                          .length
+                          .toString(),
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ],
                 ),
-                _buildActionButton(
-                  icon: Icons.share,
-                  label: 'Share',
-                  isActive: false,
-                  onTap: () {},
-                  theme: theme,
+                const SizedBox(width: 16),
+                // Comment button and count
+                Row(
+                  children: [
+                    IconButton(
+                      icon: Icon(
+                        Icons.comment,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                      onPressed: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          useSafeArea: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => CommentsSheet(postId: post.id),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      commentsAsync.when(
+                        data: (comments) => comments.length.toString(),
+                        loading: () => '...',
+                        error: (_, __) => '0',
+                      ),
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton({
-    required IconData icon,
-    required dynamic label,
-    required bool isActive,
-    required VoidCallback onTap,
-    required ThemeData theme,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isActive
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label is String ? label : label.toString(),
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: isActive
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
