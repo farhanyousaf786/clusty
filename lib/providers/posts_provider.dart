@@ -6,6 +6,7 @@ import 'package:path/path.dart' as path;
 import '../models/post_model.dart';
 import '../utils/logger.dart';
 import 'auth_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 final postsProvider = StateNotifierProvider<PostsNotifier, AsyncValue<List<PostModel>>>((ref) {
   return PostsNotifier(ref);
@@ -116,12 +117,39 @@ class PostsNotifier extends StateNotifier<AsyncValue<List<PostModel>>> {
 
   Future<String?> _uploadImage(File imageFile) async {
     try {
-      final ext = path.extension(imageFile.path);
-      final ref = _storage.ref().child('post_images/${DateTime.now().millisecondsSinceEpoch}$ext');
-      await ref.putFile(imageFile);
-      return await ref.getDownloadURL();
-    } catch (e) {
-      Logger.e('Error uploading image', e);
+      // Get current user ID from Firebase Auth
+      final currentUser = FirebaseAuth.instance.currentUser;
+      Logger.i('Firebase Auth Status: ${currentUser?.uid ?? 'Not authenticated'}');
+
+      if (currentUser == null) {
+        Logger.e('Error uploading image: User not authenticated');
+        return null;
+      }
+
+      // Upload image to Firebase Storage with same structure as profile pictures
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('post_images')
+          .child(currentUser.uid)
+          .child('${DateTime.now().millisecondsSinceEpoch}.jpg');
+
+      Logger.i('Attempting to upload file: ${ref.fullPath}');
+
+      // Upload file with metadata (same as profile pictures)
+      final metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        customMetadata: {'uploadedAt': DateTime.now().toIso8601String()},
+      );
+      
+      await ref.putFile(imageFile, metadata);
+      Logger.i('Upload completed successfully');
+
+      final downloadUrl = await ref.getDownloadURL();
+      Logger.i('Download URL obtained successfully');
+
+      return downloadUrl;
+    } catch (e, stack) {
+      Logger.e('Error uploading image', e, stack);
       return null;
     }
   }

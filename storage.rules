@@ -1,10 +1,19 @@
 rules_version = '2';
-
 service firebase.storage {
   match /b/{bucket}/o {
+    // Default rule for all paths
     match /{allPaths=**} {
-      allow read: if true;  // Allow public read access
-      allow write: if request.auth != null;  // Only allow writes from authenticated users
+      allow read, write: if true;
+    }
+    
+    // Profile pictures - simple path
+    match /profile_pictures/{userId}/{filename} {
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Post images - simple path
+    match /post_images/{userId}/{filename} {
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
